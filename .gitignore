@@ -1,0 +1,19 @@
+# Build output
+/main.js
+/main.js.map
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude local settings (contains API keys)
+.claude/.claude/

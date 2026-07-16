@@ -1,0 +1,22 @@
+{
+  "name": "obsidian-ai-voice-polish",
+  "version": "0.1.0",
+  "description": "Obsidian plugin for AI-powered voice recording and text polishing",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node build.mjs dev",
+    "build": "node build.mjs build",
+    "prepublish": "npm run build"
+  },
+  "keywords": ["obsidian", "plugin", "voice", "ai", "writing"],
+  "author": "your-name",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "obsidian": "^1.5.0",
+    "tslib": "^2.6.0",
+    "typescript": "^5.3.0"
+  }
+}

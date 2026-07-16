@@ -1,0 +1,7 @@
+- [用户画像](user-profile.md) — 用户身份与工作方式
+- [项目目标](project-goals.md) — 核心功能与上架计划
+- [Import 遗漏修复](import-bug-fix.md) — 修复设置页不显示的 bug
+- [STT 服务商架构](stt-provider-flexibility.md) — 多服务商切换框架
+- [浮动录音条](floating-recorder.md) — 可拖动小浮窗设计
+- [千问 STT 实现](qwen-stt-implementation.md) — qwen-audio-turbo 方案
+- [项目当前状态](current-state.md) — 已实现功能与待办

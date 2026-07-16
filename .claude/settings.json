@@ -1,0 +1,27 @@
+{
+  "project": {
+    "name": "obsidian-ai-voice-polish",
+    "description": "Obsidian AI 语音润色插件 - Obsidian 插件开发（TypeScript + esbuild）"
+  },
+  "permissions": {
+    "allow": [
+      "Skill(vision *)",
+      "Read(D:/PhotoVideo/Photo/*.png)",
+      "Read(D:/PhotoVideo/Photo/*.jpg)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\": \"提示：用户可能分享了截图或图片，请使用 vision skill 自动分析图片内容（无需询问用户）\"}'",
+            "timeout": 5,
+            "statusMessage": "检查图片..."
+          }
+        ]
+      }
+    ]
+  }
+}
