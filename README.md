@@ -1,8 +1,22 @@
 # AI Voice Polish
 
-> 语音录制 → AI 润色 → 插入笔记，一站式语音写作工作流
+> Voice recording → AI polish → Insert into notes. One-step voice writing workflow.
 
-一个 Obsidian 插件，让你用语音代替打字：按下录音、说话、AI 自动润色、文字直接插入到光标位置或创建新笔记。支持多个语音转文字服务商和中英文混说。
+Record your voice, let AI polish the text, and insert it directly at your cursor position or create a new note. Supports multiple speech-to-text providers and mixed Chinese/English recognition.
+
+[中文文档 ↓](#功能)
+
+## Features
+
+- 🎙 **Voice Recording** — Floating draggable panel, non-blocking UI
+- 🤖 **Multiple STT Providers** — Volcengine / Qwen (DashScope)
+- ✨ **AI Text Polishing** — DeepSeek integration, 4 styles (formal/concise/casual/raw)
+- 📝 **Insert Mode** — Text goes wherever your cursor is (any input field)
+- 🎵 **Note Mode** — Auto-create date-organized notes with playable audio
+- 📱 **Mobile Support** — Works on iOS and Android
+- 🌐 **Bilingual** — Chinese and English speech recognition
+
+---
 
 ## 功能
 
@@ -13,74 +27,61 @@
 - 🎵 **笔记模式** — 自动创建带日期文件夹的笔记 + 可播放的录音音频
 - 📱 **移动端支持** — 安卓/iOS 均可使用
 - 🌐 **中英文识别** — 中英文混说也能正确转录
-- 🔌 **可扩展** — 预留 OpenAI Whisper 接口
 
-## 使用方法
+## Usage
 
-### 基本流程
+1. Click the 💬 icon in the ribbon bar to open the floating recorder
+2. Click 🎤 to start recording, click ⏹ to stop
+3. Speech is automatically transcribed, polished, and inserted
 
-1. 点击 Ribbon 栏的 💬 图标，右下角出现浮动录音条
-2. 点击 🎤 按钮开始录音，再次点击 ⏹ 停止
-3. 松开后自动完成：语音识别 → AI 润色 → 插入光标位置
+### Mode Switching
 
-### 两种模式
+Click the 📝/🎵 button on the floating panel to switch:
 
-点击浮窗上的按钮切换：
+| Mode | Icon | Behavior |
+|------|------|----------|
+| Insert | 📝 | Text inserted at cursor position |
+| Note | 🎵 | Creates a new markdown note with embedded audio |
 
-| 模式 | 图标 | 说明 |
-|------|------|------|
-| 插入模式 | 📝 | 文字直接插入当前光标位置，不产生额外文件 |
-| 笔记模式 | 🎵 | 自动创建 Markdown 笔记 + 嵌入可播放的录音音频 |
+## Installation
 
-### 光标插入
+### From Community Plugins (pending review)
 
-插入模式下，不管你在 Obsidian 笔记、搜索框、设置页面还是任何输入框中，文字都会直接出现在光标位置。
+Search "AI Voice Polish" in Obsidian's community plugins browser.
 
-## 安装
+### Manual Installation
 
-### 社区插件市场（即将上架）
+Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/PangTouyu717/obsidian-ai-voice-polish/releases) and copy them to your vault's `.obsidian/plugins/ai-voice-polish/` folder.
 
-在 Obsidian 设置 → 社区插件 → 浏览中搜索 "AI Voice Polish"。
+## Configuration
 
-### 手动安装
+### STT Provider
 
-1. 从 [Releases](https://github.com/你的用户名/obsidian-ai-voice-polish/releases) 下载 `main.js`、`manifest.json`、`styles.css`
-2. 复制到你的 vault 目录下的 `.obsidian/plugins/ai-voice-polish/`
-3. 在 Obsidian 设置 → 社区插件中启用
+| Provider | Required Config |
+|----------|---------------|
+| Volcengine | Access Key + Secret Key + App ID |
+| Qwen (DashScope) | API Key |
 
-## 配置
+### Text Polishing
 
-### 语音转文字（STT）
+- DeepSeek API Key
+- Polish style: formal / concise / casual / raw
+- Custom prompt instructions
 
-选择你使用的服务商并填写对应的 API 凭证：
+### File Paths
 
-| 服务商 | 所需配置 | 获取方式 |
-|--------|---------|---------|
-| 火山引擎 | Access Key + Secret Key + App ID | 火山引擎控制台 → 语音识别 |
-| 千问（DashScope） | API Key | 阿里云模型服务灵积 |
+- Notes folder: where `.md` files are stored
+- Audio folder: where `.webm`/`.mp4` files are stored
 
-填写后点击「测试连接」验证配置是否有效。
+Both support date-based subfolder organization.
 
-### 文本润色
-
-- DeepSeek API Key：在 DeepSeek 官网获取
-- 润色风格：正式 / 简洁 / 口语化 / 仅修正错误
-- 自定义润色指令：额外的 prompt 要求
-
-### 文件存放路径
-
-- 笔记文件夹：语音笔记 .md 的存放位置
-- 音频文件夹：录音 .webm/.mp4 的存放位置
-
-系统会自动在配置的路径下按日期创建子文件夹（如 `Record/audio/2026-07-17/`）。
-
-## 构建
+## Build
 
 ```bash
 npm install
-npm run build    # 输出到项目根目录
+npm run build
 ```
 
-## 许可证
+## License
 
 MIT
