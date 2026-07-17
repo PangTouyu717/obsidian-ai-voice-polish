@@ -35,7 +35,7 @@ metadata:
 **上架与发布：**
 - [x] GitHub 仓库：https://github.com/PangTouyu717/obsidian-ai-voice-polish
 - [x] **已上架 Obsidian 社区插件市场 ✅**
-- [x] Release v0.1.3 已发布（息屏录音保底 + 代码审计修复）
+- [x] Release v0.1.4 已发布（息屏录音保底 + 全新 tag 无缓存问题）
 - [x] README.md（中英文双语）
 - [x] versions.json
 - [x] LICENSE（MIT）

@@ -87,29 +87,26 @@ export class AudioRecorder {
       throw new Error("当前环境不支持麦克风访问。请使用 Obsidian 桌面版或移动版，并确保已授予麦克风权限。");
     }
 
-    // 使用 ideal 而非精确值，避免因设备不支持特定采样率而报错
+    // 不指定音频处理参数——匹配 whisper 插件的设置，
+    // 让系统用默认配置处理音频，提高息屏场景的兼容性
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        sampleRate: { ideal: 16000 },
-      },
+      audio: true,
     });
 
     this.stream = stream;
     this.chunks = [];
 
-    // 不同平台优先的音频格式：
-    // - 桌面端（Electron）：webm/opus → Electron 原生支持
-    // - 安卓端：mp4 → 兼容性最好
-    // - iOS 端：mp4 → iOS 不支持 webm
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const priority = isAndroid
-      ? ["audio/mp4", "audio/webm;codec=opus", "audio/ogg;codec=opus"]
-      : isIOS
-        ? ["audio/mp4", "audio/webm;codec=opus", "audio/ogg;codec=opus"]
-        : ["audio/webm;codec=opus", "audio/webm", "audio/ogg;codec=opus", "audio/mp4"];
+    // 用更完整的 MIME 类型列表，匹配 whisper 插件
+    const priority = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/ogg",
+      "audio/mp4",
+      "audio/mp4;codecs=mp4a.40.2",
+      "audio/aac",
+      "audio/wav",
+    ];
 
     const mimeType = priority.find((type) =>
       MediaRecorder.isTypeSupported(type)

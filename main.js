@@ -92,17 +92,20 @@ var AudioRecorder = class {
       throw new Error("\u5F53\u524D\u73AF\u5883\u4E0D\u652F\u6301\u9EA6\u514B\u98CE\u8BBF\u95EE\u3002\u8BF7\u4F7F\u7528 Obsidian \u684C\u9762\u7248\u6216\u79FB\u52A8\u7248\uFF0C\u5E76\u786E\u4FDD\u5DF2\u6388\u4E88\u9EA6\u514B\u98CE\u6743\u9650\u3002");
     }
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        sampleRate: { ideal: 16e3 }
-      }
+      audio: true
     });
     this.stream = stream;
     this.chunks = [];
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const priority = isAndroid ? ["audio/mp4", "audio/webm;codec=opus", "audio/ogg;codec=opus"] : isIOS ? ["audio/mp4", "audio/webm;codec=opus", "audio/ogg;codec=opus"] : ["audio/webm;codec=opus", "audio/webm", "audio/ogg;codec=opus", "audio/mp4"];
+    const priority = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/ogg",
+      "audio/mp4",
+      "audio/mp4;codecs=mp4a.40.2",
+      "audio/aac",
+      "audio/wav"
+    ];
     const mimeType = priority.find(
       (type) => MediaRecorder.isTypeSupported(type)
     );
@@ -530,7 +533,7 @@ function styleInstruction(style) {
   };
   return (_a = map[style]) != null ? _a : map.formal;
 }
-var RETRY_DELAYS = [1e3, 3e3];
+var POLISH_TIMEOUT = 15e3;
 async function fetchWithTimeout(url, options, timeoutMs = 3e4) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -555,55 +558,35 @@ async function polishText(apiKey, text, style = "formal", extraInstructions) {
 - \u4E0D\u8981\u6DFB\u52A0\u539F\u6587\u6CA1\u6709\u7684\u4FE1\u606F
 - \u53EA\u8F93\u51FA\u6DA6\u8272\u540E\u7684\u6587\u672C\uFF0C\u4E0D\u8981\u52A0\u89E3\u91CA\u3001\u4E0D\u8981\u52A0\u5F15\u53F7
 ${extraInstructions ? `\u989D\u5916\u6307\u793A\uFF1A${extraInstructions}` : ""}`;
-  let lastError;
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
-    if (attempt > 0) {
-      const delay = RETRY_DELAYS[attempt - 1];
-      await new Promise((r) => setTimeout(r, delay));
-    }
-    try {
-      const response = await fetchWithTimeout(
-        "https://api.deepseek.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: "deepseek-chat",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: text }
-            ],
-            temperature: 0.7,
-            max_tokens: 4096
-          })
-        }
-      );
-      if (!response.ok) {
-        const err = await response.text();
-        if (response.status === 401 || response.status === 403) {
-          throw new Error(`DeepSeek API \u8BA4\u8BC1\u5931\u8D25 (${response.status})\uFF0C\u8BF7\u68C0\u67E5 API Key`);
-        }
-        if (response.status !== 429 && response.status < 500) {
-          throw new Error(`DeepSeek API \u9519\u8BEF (${response.status}): ${err.slice(0, 200)}`);
-        }
-        throw new Error(`DeepSeek API \u9519\u8BEF (${response.status}): ${err.slice(0, 200)}`);
-      }
-      const data = await response.json();
-      return {
-        original: text,
-        polished: (_e = (_d = (_c = (_b = (_a = data.choices) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content) == null ? void 0 : _d.trim()) != null ? _e : ""
-      };
-    } catch (err) {
-      lastError = err;
-      if (err instanceof Error && err.message.includes("API \u8BA4\u8BC1\u5931\u8D25"))
-        throw err;
-    }
+  const response = await fetchWithTimeout(
+    "https://api.deepseek.com/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text }
+        ],
+        temperature: 0.5,
+        max_tokens: 1024
+      })
+    },
+    POLISH_TIMEOUT
+  );
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`DeepSeek API \u9519\u8BEF (${response.status})`);
   }
-  const errorMessage = lastError instanceof Error ? lastError.message : String(lastError);
-  throw new Error(`\u6DA6\u8272\u5931\u8D25\uFF0C\u5DF2\u91CD\u8BD5 ${RETRY_DELAYS.length} \u6B21: ${errorMessage}`);
+  const data = await response.json();
+  return {
+    original: text,
+    polished: (_e = (_d = (_c = (_b = (_a = data.choices) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) == null ? void 0 : _c.content) == null ? void 0 : _d.trim()) != null ? _e : ""
+  };
 }
 async function testDeepSeekConnection(apiKey) {
   try {

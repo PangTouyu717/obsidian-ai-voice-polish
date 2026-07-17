@@ -9,4 +9,5 @@
 - [v0.1.2 发布记录](release-v0.1.2.md) — 修复自动更新 404
 - [息屏录音中断](screen-off-recording.md) — 手机端防息屏录音方案（参考 whisper 插件）
 - [自动存储偏好](auto-save-preference.md) — 每次对话结束自动保存，无需批准
+- [Release 发版铁律](release-rules.md) — 发版 Checklist，必须遵守
 - [项目当前状态](current-state.md) — 已实现功能与待办
