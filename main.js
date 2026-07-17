@@ -629,6 +629,9 @@ var _FloatingRecorder = class _FloatingRecorder {
     this.mode = "insert";
     /** 录音数据（笔记模式需要存到 vault） */
     this.lastAudioBlob = null;
+    /** 插入原文时记录的位置（给后台润色替换用） */
+    this.insertedStart = null;
+    this.insertedEnd = null;
     // 拖动
     this.isDragging = false;
     this.dragStartX = 0;
@@ -865,6 +868,15 @@ var _FloatingRecorder = class _FloatingRecorder {
       const view = this.plugin.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
       if (view) {
         const editor = view.editor;
+        if (this.insertedStart && this.insertedEnd) {
+          editor.setSelection(this.insertedStart, this.insertedEnd);
+          if (editor.getSelection() === this.rawText) {
+            editor.replaceSelection(result.polished);
+            this.insertedStart = this.insertedEnd = null;
+            new import_obsidian.Notice("\u2705 \u6DA6\u8272\u5DF2\u5B8C\u6210");
+            return;
+          }
+        }
         const content = editor.getValue();
         const idx = content.lastIndexOf(this.rawText);
         if (idx !== -1) {
@@ -874,6 +886,13 @@ var _FloatingRecorder = class _FloatingRecorder {
           new import_obsidian.Notice("\u2705 \u6DA6\u8272\u5DF2\u5B8C\u6210");
           return;
         }
+        try {
+          await navigator.clipboard.writeText(result.polished);
+          new import_obsidian.Notice("\u2705 \u6DA6\u8272\u5B8C\u6210\uFF08\u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F\uFF09");
+        } catch (e) {
+          new import_obsidian.Notice("\u2705 \u6DA6\u8272\u5B8C\u6210\uFF08\u539F\u6587\u5DF2\u4FDD\u7559\uFF0C\u6DA6\u8272\u7ED3\u679C\u5982\u4E0B\uFF09\n" + result.polished.slice(0, 100));
+        }
+        return;
       }
       try {
         await navigator.clipboard.writeText(result.polished);
@@ -952,7 +971,11 @@ var _FloatingRecorder = class _FloatingRecorder {
     }
     const view = this.plugin.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
     if (view) {
-      view.editor.replaceSelection(text);
+      const editor = view.editor;
+      const cursor = editor.getCursor();
+      editor.replaceSelection(text);
+      this.insertedStart = { ...cursor };
+      this.insertedEnd = { ...editor.getCursor() };
       new import_obsidian.Notice("\u2705 \u5DF2\u63D2\u5165");
       this.close();
       return;

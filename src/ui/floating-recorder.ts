@@ -47,6 +47,10 @@ export class FloatingRecorder {
   /** 录音数据（笔记模式需要存到 vault） */
   private lastAudioBlob: Blob | null = null;
 
+  /** 插入原文时记录的位置（给后台润色替换用） */
+  private insertedStart: { line: number; ch: number } | null = null;
+  private insertedEnd: { line: number; ch: number } | null = null;
+
   // 拖动
   private isDragging = false;
   private dragStartX = 0;
@@ -342,10 +346,23 @@ export class FloatingRecorder {
 
       if (!result.polished || result.polished === this.rawText) return;
 
-      // 尝试替换当前编辑器里的原文
+      // 尝试替换：先按记录的位置替换，失败再全文搜索
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
       if (view) {
         const editor = view.editor;
+
+        // 1️⃣ 按记录的位置替换（用户没动过原文 → 最精确）
+        if (this.insertedStart && this.insertedEnd) {
+          editor.setSelection(this.insertedStart, this.insertedEnd);
+          if (editor.getSelection() === this.rawText) {
+            editor.replaceSelection(result.polished);
+            this.insertedStart = this.insertedEnd = null;
+            new Notice("✅ 润色已完成");
+            return;
+          }
+        }
+
+        // 2️⃣ 用户可能改过原文 → 全文搜索容错
         const content = editor.getValue();
         const idx = content.lastIndexOf(this.rawText);
         if (idx !== -1) {
@@ -355,9 +372,18 @@ export class FloatingRecorder {
           new Notice("✅ 润色已完成");
           return;
         }
+
+        // 3️⃣ 真的找不到了 → 把润色结果放剪贴板
+        try {
+          await navigator.clipboard.writeText(result.polished);
+          new Notice("✅ 润色完成（已复制到剪贴板）");
+        } catch {
+          new Notice("✅ 润色完成（原文已保留，润色结果如下）\n" + result.polished.slice(0, 100));
+        }
+        return;
       }
 
-      // 找不到原文 → 把润色结果放剪贴板
+      // 笔记模式或其他情况→放剪贴板
       try {
         await navigator.clipboard.writeText(result.polished);
         new Notice("✅ 润色完成（已复制到剪贴板）");
@@ -447,7 +473,13 @@ export class FloatingRecorder {
     // Obsidian Markdown 编辑器
     const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
     if (view) {
-      view.editor.replaceSelection(text);
+      const editor = view.editor;
+      // 记下插入前位置
+      const cursor = editor.getCursor();
+      editor.replaceSelection(text);
+      // 记下插入后位置（给后台润色替换用）
+      this.insertedStart = { ...cursor };
+      this.insertedEnd = { ...editor.getCursor() };
       new Notice("✅ 已插入");
       this.close();
       return;
