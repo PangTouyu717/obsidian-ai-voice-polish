@@ -34,6 +34,8 @@ var AudioRecorder = class {
     this.chunks = [];
     this.startTime = 0;
     this.stream = null;
+    /** 音频管道：将麦克风流接入系统音频输出，阻止 WebView 后台暂停 */
+    this.audioPipeline = null;
   }
   /** 当前录制状态 */
   get state() {
@@ -43,6 +45,34 @@ var AudioRecorder = class {
   /** 是否有已收集的音频数据（息屏中断后仍有数据） */
   get hasData() {
     return this.chunks.length > 0;
+  }
+  /**
+   * 将麦克风流接入 AudioContext 并静音输出到扬声器。
+   * 系统检测到音频管道活跃 → 后台不暂停 WebView → 录音持续。
+   */
+  startAudioPipeline(stream) {
+    try {
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor)
+        return;
+      this.audioPipeline = new Ctor();
+      const src = this.audioPipeline.createMediaStreamSource(stream);
+      const gain = this.audioPipeline.createGain();
+      gain.gain.value = 0;
+      src.connect(gain);
+      gain.connect(this.audioPipeline.destination);
+    } catch (e) {
+    }
+  }
+  /** 关闭音频管道 */
+  stopAudioPipeline() {
+    if (this.audioPipeline) {
+      try {
+        this.audioPipeline.close();
+      } catch (e) {
+      }
+      this.audioPipeline = null;
+    }
   }
   /**
    * 开始录制
@@ -76,6 +106,7 @@ var AudioRecorder = class {
         this.chunks.push(event.data);
       }
     };
+    this.startAudioPipeline(stream);
     this.mediaRecorder.start(100);
     this.startTime = Date.now();
   }
@@ -144,13 +175,14 @@ var AudioRecorder = class {
     });
   }
   /**
-   * 释放麦克风
+   * 释放麦克风和音频管道
    */
   cleanup() {
     var _a;
     (_a = this.stream) == null ? void 0 : _a.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.mediaRecorder = null;
+    this.stopAudioPipeline();
   }
   /** 取消录制（丢弃数据） */
   cancel() {
@@ -163,6 +195,7 @@ var AudioRecorder = class {
     this.stream = null;
     this.mediaRecorder = null;
     this.chunks = [];
+    this.stopAudioPipeline();
   }
 };
 

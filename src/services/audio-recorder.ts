@@ -21,6 +21,8 @@ export class AudioRecorder {
   private chunks: Blob[] = [];
   private startTime = 0;
   private stream: MediaStream | null = null;
+  /** 音频管道：将麦克风流接入系统音频输出，阻止 WebView 后台暂停 */
+  private audioPipeline: AudioContext | null = null;
   /** 当前录制状态 */
   get state(): RecordingState {
     return this.mediaRecorder?.state ?? "inactive";
@@ -29,6 +31,31 @@ export class AudioRecorder {
   /** 是否有已收集的音频数据（息屏中断后仍有数据） */
   get hasData(): boolean {
     return this.chunks.length > 0;
+  }
+
+  /**
+   * 将麦克风流接入 AudioContext 并静音输出到扬声器。
+   * 系统检测到音频管道活跃 → 后台不暂停 WebView → 录音持续。
+   */
+  private startAudioPipeline(stream: MediaStream): void {
+    try {
+      const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+      if (!Ctor) return;
+      this.audioPipeline = new Ctor();
+      const src = this.audioPipeline.createMediaStreamSource(stream);
+      const gain = this.audioPipeline.createGain();
+      gain.gain.value = 0; // 完全静音
+      src.connect(gain);
+      gain.connect(this.audioPipeline.destination);
+    } catch {}
+  }
+
+  /** 关闭音频管道 */
+  private stopAudioPipeline(): void {
+    if (this.audioPipeline) {
+      try { this.audioPipeline.close(); } catch {}
+      this.audioPipeline = null;
+    }
   }
 
   /**
@@ -75,8 +102,10 @@ export class AudioRecorder {
       }
     };
 
+    // 麦克风流接入系统音频管道 → 后台不被暂停
+    this.startAudioPipeline(stream);
+
     // 使用 timeslice=100，每 100ms 输出一段数据
-    // 频繁刷数据确保即使息屏中断，也不会丢失大段音频
     this.mediaRecorder.start(100);
     this.startTime = Date.now();
   }
@@ -156,12 +185,13 @@ export class AudioRecorder {
   }
 
   /**
-   * 释放麦克风
+   * 释放麦克风和音频管道
    */
   private cleanup(): void {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.mediaRecorder = null;
+    this.stopAudioPipeline();
   }
 
   /** 取消录制（丢弃数据） */
@@ -174,5 +204,6 @@ export class AudioRecorder {
     this.stream = null;
     this.mediaRecorder = null;
     this.chunks = [];
+    this.stopAudioPipeline();
   }
 }
