@@ -34,11 +34,54 @@ var AudioRecorder = class {
     this.chunks = [];
     this.startTime = 0;
     this.stream = null;
+    this.wakeLock = null;
+    /**
+     * 页面可见性变化时重新请求 Wake Lock
+     */
+    this.handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && this.state === "recording") {
+        navigator.wakeLock.request("screen").then((wl) => {
+          this.wakeLock = wl;
+        }).catch(() => {
+        });
+      }
+    };
   }
   /** 当前录制状态 */
   get state() {
     var _a, _b;
     return (_b = (_a = this.mediaRecorder) == null ? void 0 : _a.state) != null ? _b : "inactive";
+  }
+  /** 是否有已收集的音频数据（息屏中断后仍有数据） */
+  get hasData() {
+    return this.chunks.length > 0;
+  }
+  /**
+   * 请求屏幕常亮（防止息屏导致录音中断）
+   * 幂等：重复调用不会重复添加监听器
+   */
+  async requestWakeLock() {
+    try {
+      if ("wakeLock" in navigator) {
+        document.removeEventListener("visibilitychange", this.handleVisibilityChange);
+        this.wakeLock = await navigator.wakeLock.request("screen");
+        document.addEventListener("visibilitychange", this.handleVisibilityChange);
+      }
+    } catch (e) {
+    }
+  }
+  /**
+   * 释放屏幕常亮
+   */
+  async releaseWakeLock() {
+    document.removeEventListener("visibilitychange", this.handleVisibilityChange);
+    if (this.wakeLock) {
+      try {
+        await this.wakeLock.release();
+      } catch (e) {
+      }
+      this.wakeLock = null;
+    }
   }
   /**
    * 开始录制
@@ -69,42 +112,83 @@ var AudioRecorder = class {
         this.chunks.push(event.data);
       }
     };
-    this.mediaRecorder.start();
+    this.mediaRecorder.start(100);
     this.startTime = Date.now();
+    this.requestWakeLock();
   }
   /**
    * 停止录制并返回音频数据
+   *
+   * 核心原则：只要 chunks 有数据就返回，不 reject。
+   * 息屏中断也好、异常也好，录了多少就给你多少。
    * @returns 录制完成的音频数据
    */
   stop() {
-    return new Promise((resolve, reject) => {
-      if (!this.mediaRecorder || this.mediaRecorder.state === "inactive") {
-        reject(new Error("\u6CA1\u6709\u6B63\u5728\u8FDB\u884C\u7684\u5F55\u5236"));
+    if (!this.mediaRecorder && this.chunks.length > 0) {
+      return this.buildAudioDataFromChunks("\u5DF2\u4E2D\u65AD");
+    }
+    if (!this.mediaRecorder) {
+      return Promise.reject(new Error("\u6CA1\u6709\u5F55\u97F3\u6570\u636E"));
+    }
+    return new Promise((resolve) => {
+      if (this.mediaRecorder.state === "inactive") {
+        const data = this.buildAudioData("\u5DF2\u4E2D\u65AD");
+        this.cleanup();
+        resolve(data);
         return;
       }
       this.mediaRecorder.onstop = () => {
-        var _a, _b, _c;
-        const durationSeconds = (Date.now() - this.startTime) / 1e3;
-        const blob = new Blob(this.chunks, {
-          type: (_b = (_a = this.mediaRecorder) == null ? void 0 : _a.mimeType) != null ? _b : "audio/webm"
-        });
-        (_c = this.stream) == null ? void 0 : _c.getTracks().forEach((t) => t.stop());
-        this.stream = null;
-        this.mediaRecorder = null;
-        resolve({
-          blob,
-          durationSeconds: Math.round(durationSeconds * 10) / 10,
-          mimeType: blob.type
-        });
+        const data = this.buildAudioData("\u6B63\u5E38\u7ED3\u675F");
+        this.cleanup();
+        resolve(data);
       };
       this.mediaRecorder.onerror = () => {
-        var _a;
-        (_a = this.stream) == null ? void 0 : _a.getTracks().forEach((t) => t.stop());
-        this.stream = null;
-        reject(new Error("\u5F55\u5236\u8FC7\u7A0B\u4E2D\u53D1\u751F\u9519\u8BEF"));
+        const data = this.buildAudioData("\u5F02\u5E38\u7ED3\u675F");
+        this.cleanup();
+        resolve(data);
       };
       this.mediaRecorder.stop();
     });
+  }
+  /**
+   * 用当前 chunks 拼装 AudioData
+   */
+  buildAudioData(_reason) {
+    var _a, _b;
+    const durationSeconds = (Date.now() - this.startTime) / 1e3;
+    const blob = new Blob(this.chunks, {
+      type: (_b = (_a = this.mediaRecorder) == null ? void 0 : _a.mimeType) != null ? _b : "audio/webm"
+    });
+    return {
+      blob,
+      durationSeconds: Math.round(durationSeconds * 10) / 10,
+      mimeType: blob.type
+    };
+  }
+  /**
+   * 从已有 chunks 构建 AudioData，不依赖 MediaRecorder 实例
+   */
+  buildAudioDataFromChunks(reason) {
+    this.cleanup();
+    const durationSeconds = (Date.now() - this.startTime) / 1e3;
+    const blob = new Blob(this.chunks, {
+      type: "audio/webm"
+    });
+    return Promise.resolve({
+      blob,
+      durationSeconds: Math.round(durationSeconds * 10) / 10,
+      mimeType: blob.type
+    });
+  }
+  /**
+   * 释放麦克风和 Wake Lock
+   */
+  cleanup() {
+    var _a;
+    (_a = this.stream) == null ? void 0 : _a.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    this.mediaRecorder = null;
+    this.releaseWakeLock();
   }
   /** 取消录制（丢弃数据） */
   cancel() {
@@ -117,6 +201,7 @@ var AudioRecorder = class {
     this.stream = null;
     this.mediaRecorder = null;
     this.chunks = [];
+    this.releaseWakeLock();
   }
 };
 
@@ -570,6 +655,19 @@ var _FloatingRecorder = class _FloatingRecorder {
     // 计时
     this.durationTimer = null;
     this.recordStartTime = 0;
+    /** 息屏检测处理器（用于清理） */
+    this.onVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && this.state === "recording") {
+        new import_obsidian.Notice("\u23FA \u5F55\u97F3\u5728\u540E\u53F0\u7EE7\u7EED\u8FD0\u884C");
+      } else if (document.visibilityState === "visible" && this.state === "recording") {
+        if (this.recorder.state === "inactive" && this.recorder.hasData) {
+          new import_obsidian.Notice("\u{1F501} \u68C0\u6D4B\u5230\u5F55\u97F3\u4E2D\u65AD\uFF0C\u6B63\u5728\u5904\u7406\u5DF2\u5F55\u5236\u7684\u97F3\u9891...");
+          this.stopRecording();
+        } else if (this.recorder.state === "recording") {
+          new import_obsidian.Notice("\u2705 \u5F55\u97F3\u4E00\u5207\u6B63\u5E38");
+        }
+      }
+    };
     this.plugin = plugin;
     this.recorder = new AudioRecorder();
     this.sttProvider = createSTTProvider(plugin.settings);
@@ -641,6 +739,7 @@ var _FloatingRecorder = class _FloatingRecorder {
     if (this.recorder.state !== "inactive") {
       this.recorder.cancel();
     }
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
   }
   // ── 状态机 ─────────────────────────────────
   async handleMicClick() {
@@ -687,7 +786,9 @@ var _FloatingRecorder = class _FloatingRecorder {
       this.recordStartTime = Date.now();
       this.micBtn.textContent = "\u23F9";
       this.micBtn.style.background = "var(--text-error)";
+      this.micBtn.style.color = "white";
       this.statusEl.textContent = "\u5F55\u97F3\u4E2D... \u70B9\u51FB\u505C\u6B62";
+      document.addEventListener("visibilitychange", this.onVisibilityChange);
       this.startDurationTimer();
     } catch (err) {
       new import_obsidian.Notice(`[E101] \u65E0\u6CD5\u542F\u52A8\u9EA6\u514B\u98CE: ${err}`);
@@ -1068,6 +1169,7 @@ ${text}
     this.micBtn.removeAttribute("disabled");
     this.durationEl.textContent = "";
     this.cleanupDurationTimer();
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     if (this.mode === "note") {
       this.statusEl.textContent = "\u7B14\u8BB0+\u97F3\u9891\u6A21\u5F0F";
     } else {

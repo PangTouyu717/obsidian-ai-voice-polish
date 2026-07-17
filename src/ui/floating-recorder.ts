@@ -159,6 +159,7 @@ export class FloatingRecorder {
     if (this.recorder.state !== "inactive") {
       this.recorder.cancel();
     }
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
   }
 
   // ── 状态机 ─────────────────────────────────
@@ -204,6 +205,21 @@ export class FloatingRecorder {
     return false;
   }
 
+  /** 息屏检测处理器（用于清理） */
+  private onVisibilityChange = () => {
+    if (document.visibilityState === "hidden" && this.state === "recording") {
+      new Notice("⏺ 录音在后台继续运行");
+    } else if (document.visibilityState === "visible" && this.state === "recording") {
+      // 亮屏后检测录音是否还活着
+      if (this.recorder.state === "inactive" && this.recorder.hasData) {
+        new Notice("🔁 检测到录音中断，正在处理已录制的音频...");
+        this.stopRecording();
+      } else if (this.recorder.state === "recording") {
+        new Notice("✅ 录音一切正常");
+      }
+    }
+  };
+
   private async startRecording() {
     if (!this.checkConfig()) return;
 
@@ -213,7 +229,10 @@ export class FloatingRecorder {
       this.recordStartTime = Date.now();
       this.micBtn.textContent = "⏹";
       this.micBtn.style.background = "var(--text-error)";
+      this.micBtn.style.color = "white";
       this.statusEl.textContent = "录音中... 点击停止";
+
+      document.addEventListener("visibilitychange", this.onVisibilityChange);
       this.startDurationTimer();
     } catch (err) {
       new Notice(`[E101] 无法启动麦克风: ${err}`);
@@ -650,6 +669,7 @@ export class FloatingRecorder {
     this.micBtn.removeAttribute("disabled");
     this.durationEl.textContent = "";
     this.cleanupDurationTimer();
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
 
     // 根据当前模式显示状态
     if (this.mode === "note") {
