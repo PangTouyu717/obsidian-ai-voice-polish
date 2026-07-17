@@ -7,6 +7,6 @@
 - [插入模式事前确认](insert-mode-ahead-check.md) — 录音前检查光标位置
 - [Release 发布修复](release-publish-fix.md) — main.js 必须提交到仓库
 - [v0.1.2 发布记录](release-v0.1.2.md) — 修复自动更新 404
-- [息屏录音中断](screen-off-recording.md) — 手机端防息屏录音方案
+- [息屏录音中断](screen-off-recording.md) — 手机端防息屏录音方案（参考 whisper 插件）
 - [自动存储偏好](auto-save-preference.md) — 每次对话结束自动保存，无需批准
 - [项目当前状态](current-state.md) — 已实现功能与待办
