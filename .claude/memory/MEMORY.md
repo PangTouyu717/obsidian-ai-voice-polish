@@ -4,4 +4,7 @@
 - [STT 服务商架构](stt-provider-flexibility.md) — 多服务商切换框架
 - [浮动录音条](floating-recorder.md) — 可拖动小浮窗设计
 - [千问 STT 实现](qwen-stt-implementation.md) — qwen-audio-turbo 方案
+- [插入模式事前确认](insert-mode-ahead-check.md) — 录音前检查光标位置
+- [Release 发布修复](release-publish-fix.md) — main.js 必须提交到仓库
+- [自动存储偏好](auto-save-preference.md) — 每次对话结束自动保存，无需批准
 - [项目当前状态](current-state.md) — 已实现功能与待办
