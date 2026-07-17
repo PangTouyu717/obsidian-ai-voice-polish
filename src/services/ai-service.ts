@@ -32,8 +32,8 @@ function styleInstruction(style: PolishStyle): string {
   return map[style] ?? map.formal;
 }
 
-/** 润色超时（毫秒）— 15 秒足矣，失败就用原文 */
-const POLISH_TIMEOUT = 15000;
+/** 润色超时（毫秒）— 60 秒，手机上网络可能较慢 */
+const POLISH_TIMEOUT = 60000;
 
 /**
  * 带超时的 fetch

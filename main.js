@@ -527,7 +527,7 @@ function styleInstruction(style) {
   };
   return (_a = map[style]) != null ? _a : map.formal;
 }
-var POLISH_TIMEOUT = 15e3;
+var POLISH_TIMEOUT = 6e4;
 async function fetchWithTimeout(url, options, timeoutMs = 3e4) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
