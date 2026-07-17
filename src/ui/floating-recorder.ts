@@ -335,6 +335,7 @@ export class FloatingRecorder {
   /** 后台润色：成功就替换原文，失败就保留原文 */
   private async backgroundPolish() {
     this.state = "polishing";
+    new Notice("⏳ 润色中...");
 
     try {
       const result = await polishText(
@@ -344,7 +345,10 @@ export class FloatingRecorder {
         this.plugin.settings.customPrompt || undefined
       );
 
-      if (!result.polished || result.polished === this.rawText) return;
+      if (!result.polished || result.polished === this.rawText) {
+        new Notice("ℹ️ 原文无需润色，已保留原文");
+        return;
+      }
 
       // 尝试替换：先按记录的位置替换，失败再全文搜索
       const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
@@ -390,8 +394,10 @@ export class FloatingRecorder {
       } catch {
         new Notice("✅ 润色完成");
       }
-    } catch {
-      // 润色失败，原文已经插入了，不需要做任何事
+    } catch (err) {
+      // 润色失败：通知用户，但原文已经插入，不影响使用
+      console.error("润色失败:", err);
+      new Notice(`ℹ️ 润色未完成（已保留原文）`);
     }
   }
 

@@ -850,6 +850,7 @@ var _FloatingRecorder = class _FloatingRecorder {
   /** 后台润色：成功就替换原文，失败就保留原文 */
   async backgroundPolish() {
     this.state = "polishing";
+    new import_obsidian.Notice("\u23F3 \u6DA6\u8272\u4E2D...");
     try {
       const result = await polishText(
         this.plugin.settings.deepseekApiKey,
@@ -857,8 +858,10 @@ var _FloatingRecorder = class _FloatingRecorder {
         this.plugin.settings.polishStyle,
         this.plugin.settings.customPrompt || void 0
       );
-      if (!result.polished || result.polished === this.rawText)
+      if (!result.polished || result.polished === this.rawText) {
+        new import_obsidian.Notice("\u2139\uFE0F \u539F\u6587\u65E0\u9700\u6DA6\u8272\uFF0C\u5DF2\u4FDD\u7559\u539F\u6587");
         return;
+      }
       const view = this.plugin.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
       if (view) {
         const editor = view.editor;
@@ -894,7 +897,9 @@ var _FloatingRecorder = class _FloatingRecorder {
       } catch (e) {
         new import_obsidian.Notice("\u2705 \u6DA6\u8272\u5B8C\u6210");
       }
-    } catch (e) {
+    } catch (err) {
+      console.error("\u6DA6\u8272\u5931\u8D25:", err);
+      new import_obsidian.Notice(`\u2139\uFE0F \u6DA6\u8272\u672A\u5B8C\u6210\uFF08\u5DF2\u4FDD\u7559\u539F\u6587\uFF09`);
     }
   }
   // ── 插入到光标位置 ──────────────────────────
