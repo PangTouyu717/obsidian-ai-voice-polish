@@ -8,6 +8,7 @@
  * 模型: qwen-audio-turbo
  */
 
+import { requestUrl } from "obsidian";
 import { STTProvider, STTResult } from "./stt-provider";
 
 /** Blob 转完整 data URL（如 "data:audio/webm;base64,xxx"） */
@@ -38,40 +39,37 @@ export class QwenSTT implements STTProvider {
 
     const audioDataUrl = await blobToDataUrl(audioBlob);
 
-    const response = await fetch(
-      "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
+    const response = await requestUrl({
+      url: "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
+      method: "POST",
+      contentType: "application/json",
+      body: JSON.stringify({
+        model: "qwen-audio-turbo",
+        input: {
+          messages: [
+            {
+              role: "user",
+              content: [
+                { audio: audioDataUrl },
+                { text: "Transcribe this audio to text. Auto-detect the language (Chinese, English, or mixed). Output ONLY the transcription, no explanations." },
+              ],
+            },
+          ],
         },
-        body: JSON.stringify({
-          model: "qwen-audio-turbo",
-          input: {
-            messages: [
-              {
-                role: "user",
-                content: [
-                  { audio: audioDataUrl },
-                  { text: "Transcribe this audio to text. Auto-detect the language (Chinese, English, or mixed). Output ONLY the transcription, no explanations." },
-                ],
-              },
-            ],
-          },
-          parameters: {
-            result_format: "message",
-          },
-        }),
-      }
-    );
+        parameters: {
+          result_format: "message",
+        },
+      }),
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+    });
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`千问 STT 错误 (${response.status}): ${err}`);
+    if (response.status !== 200) {
+      throw new Error(`千问 STT 错误 (${response.status})`);
     }
 
-    const data = await response.json();
+    const data = response.json;
 
     // 原生多模态 API 响应格式: output.choices[0].message.content[{text: ...}]
     const content = data.output?.choices?.[0]?.message?.content;
@@ -102,16 +100,14 @@ export async function testQwenConnection(
   }
 
   try {
-    const response = await fetch(
-      "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-      }
-    );
+    const response = await requestUrl({
+      url: "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
 
-    if (response.ok) {
+    if (response.status === 200) {
       return { ok: true, message: "千问 API 连接正常 ✅" };
     }
 
@@ -120,6 +116,7 @@ export async function testQwenConnection(
     }
     return { ok: false, message: `连接失败 (${response.status})` };
   } catch (err) {
-    return { ok: false, message: `网络错误: ${err}` };
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, message: `网络错误: ${msg}` };
   }
 }

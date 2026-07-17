@@ -58,6 +58,10 @@ export class FloatingRecorder {
   private panelStartX = 0;
   private panelStartY = 0;
 
+  // 保存 bound 引用，防止 addEventListener/removeEventListener 不匹配
+  private boundDragMove: (e: MouseEvent | TouchEvent) => void;
+  private boundDragEnd: () => void;
+
   // 计时
   private durationTimer: number | null = null;
   private recordStartTime = 0;
@@ -69,6 +73,11 @@ export class FloatingRecorder {
     this.plugin = plugin;
     this.recorder = new AudioRecorder();
     this.sttProvider = createSTTProvider(plugin.settings);
+
+    // 提前绑定事件处理器，确保 add/removeEventListener 用同一引用
+    this.boundDragMove = (e) => this.onDragMove(e);
+    this.boundDragEnd = () => this.onDragEnd();
+
     this.createPanel();
 
     // 全局监听焦点变化：用户点到哪，就记住哪
@@ -122,10 +131,10 @@ export class FloatingRecorder {
     // 拖动（鼠标 + 触屏）
     this.panelEl.addEventListener("mousedown", (e) => this.onDragStart(e));
     this.panelEl.addEventListener("touchstart", (e) => this.onDragStart(e), { passive: false });
-    document.addEventListener("mousemove", (e) => this.onDragMove(e));
-    document.addEventListener("touchmove", (e) => this.onDragMove(e), { passive: false });
-    document.addEventListener("mouseup", () => this.onDragEnd());
-    document.addEventListener("touchend", () => this.onDragEnd());
+    document.addEventListener("mousemove", this.boundDragMove);
+    document.addEventListener("touchmove", this.boundDragMove, { passive: false });
+    document.addEventListener("mouseup", this.boundDragEnd);
+    document.addEventListener("touchend", this.boundDragEnd);
 
     // 恢复上次位置
     this.restorePosition();
@@ -151,10 +160,10 @@ export class FloatingRecorder {
   /** 完全销毁（插件卸载时调用） */
   destroy() {
     this.cleanup();
-    document.removeEventListener("mousemove", (e) => this.onDragMove(e));
-    document.removeEventListener("mouseup", () => this.onDragEnd());
-    document.removeEventListener("touchmove", (e) => this.onDragMove(e));
-    document.removeEventListener("touchend", () => this.onDragEnd());
+    document.removeEventListener("mousemove", this.boundDragMove);
+    document.removeEventListener("mouseup", this.boundDragEnd);
+    document.removeEventListener("touchmove", this.boundDragMove);
+    document.removeEventListener("touchend", this.boundDragEnd);
     this.panelEl.remove();
   }
 
@@ -209,23 +218,27 @@ export class FloatingRecorder {
     return false;
   }
 
-  /** 息屏检测处理器 */
+  /** 前后台切换处理器 */
   private onVisibilityChange = () => {
     if (document.visibilityState === "hidden" && this.state === "recording") {
-      new Notice("⏺ 录音仍在进行");
+      // 切到后台：啥也不做，录音自己扛着
     } else if (document.visibilityState === "visible" && this.state === "recording") {
-      if (this.recorder.state === "recording") {
-        new Notice("✅ 录音正常");
-      } else if (this.recorder.state === "inactive") {
-        // 录音在息屏期间停止了
-        // 不自动停止，让用户自己点停止来处理已有数据
-        new Notice("⏸ 录音在息屏时已中断，点停止获取已录制的内容");
-        this.micBtn.style.background = "orange";
-        this.micBtn.style.color = "white";
-        this.statusEl.textContent = "录音已中断，点击停止";
-      }
+      // 切回前台：尝试恢复录音（新 stream + 新 recorder，保留已有数据）
+      this.recoverRecording();
     }
   };
+
+  /** 恢复被后台打断的录音 */
+  private async recoverRecording() {
+    try {
+      await this.recorder.recover();
+      new Notice("🔁 录音已恢复");
+    } catch {
+      new Notice("⚠️ 录音未能恢复，请点停止重新录制");
+      this.micBtn.style.background = "orange";
+      this.statusEl.textContent = "录音已中断，点击停止";
+    }
+  }
 
   private async startRecording() {
     if (!this.checkConfig()) return;
@@ -238,6 +251,7 @@ export class FloatingRecorder {
       this.micBtn.style.background = "var(--text-error)";
       this.micBtn.style.color = "white";
       this.statusEl.textContent = "录音中... 点击停止";
+      this.plugin.setStatusBar("🎙 录音中...", true);
 
       document.addEventListener("visibilitychange", this.onVisibilityChange);
       this.startDurationTimer();
@@ -406,26 +420,6 @@ export class FloatingRecorder {
   }
 
   // ── 插入到光标位置 ──────────────────────────
-
-  /**
-   * 根据当前模式处理结果：
-   * - 插入模式 → 文字插入光标位置
-   * - 笔记模式 → 创建新笔记（含润色文字 + 音频文件）
-   */
-  private async insertToTarget() {
-    this.state = "done";
-    const text = this.polishedText || this.rawText;
-    if (!text) {
-      this.close();
-      return;
-    }
-
-    if (this.mode === "note") {
-      await this.createNoteWithAudio(text);
-    } else {
-      await this.insertTextAtCursor(text);
-    }
-  }
 
   /** 插入模式：文字放到光标位置 */
   private async insertTextAtCursor(text: string) {
@@ -778,6 +772,7 @@ export class FloatingRecorder {
     this.durationEl.textContent = "";
     this.cleanupDurationTimer();
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    this.plugin.setStatusBar("🎙 待命", false);
 
     // 根据当前模式显示状态
     if (this.mode === "note") {

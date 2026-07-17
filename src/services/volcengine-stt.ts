@@ -7,6 +7,7 @@
  * API 文档：https://www.volcengine.com/docs/6561/80828
  */
 
+import { requestUrl } from "obsidian";
 import { STTProvider, STTResult } from "./stt-provider";
 
 // ── 工具函数 ─────────────────────────────────
@@ -154,33 +155,31 @@ export class VolcengineSTT implements STTProvider {
       bodyStr
     );
 
-    const response = await fetch(`https://${host}${uri}`, {
+    const response = await requestUrl({
+      url: `https://${host}${uri}`,
       method: "POST",
+      contentType: "application/json",
+      body: bodyStr,
       headers: {
-        "Content-Type": "application/json",
         Host: host,
         "X-Date": date,
         Authorization: authorization,
       },
-      body: bodyStr,
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`火山引擎 STT 错误 (${response.status}): ${err}`);
+    if (response.status !== 200) {
+      throw new Error(`火山引擎 STT 错误 (${response.status})`);
     }
 
-    const data = await response.json();
-
-    if (data.code !== 0 && data.code !== 3000) {
+    if (response.json.code !== 0 && response.json.code !== 3000) {
       throw new Error(
-        `火山引擎 STT 业务错误 (code=${data.code}): ${data.message ?? ""}`
+        `火山引擎 STT 业务错误 (code=${response.json.code}): ${response.json.message ?? ""}`
       );
     }
 
     return {
-      text: data.result?.text ?? "",
-      durationSeconds: Math.round((audioBlob.size / 16000 / 2) * 10) / 10, // 粗略估算
+      text: response.json.result?.text ?? "",
+      durationSeconds: Math.round((audioBlob.size / 16000 / 2) * 10) / 10,
     };
   }
 }
@@ -228,24 +227,28 @@ export async function testVolcengineConnection(
       accessKey, secretKey, "POST", uri, "", host, date, bodyStr
     );
 
-    const response = await fetch(`https://${host}${uri}`, {
+    const response = await requestUrl({
+      url: `https://${host}${uri}`,
       method: "POST",
+      contentType: "application/json",
+      body: bodyStr,
       headers: {
-        "Content-Type": "application/json",
         Host: host,
         "X-Date": date,
         Authorization: authorization,
       },
-      body: bodyStr,
     });
 
     if (response.status === 401 || response.status === 403) {
       return { ok: false, message: "鉴权失败，请检查 Access Key、Secret Key 和 App ID" };
     }
 
-    // 200 或 4xx 其他错误（说明至少连上了服务器）
     return { ok: true, message: "火山引擎 API 连接正常 ✅" };
   } catch (err) {
-    return { ok: false, message: `网络错误: ${err}` };
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("401") || msg.includes("403")) {
+      return { ok: false, message: "鉴权失败，请检查 Access Key、Secret Key 和 App ID" };
+    }
+    return { ok: false, message: `网络错误: ${msg}` };
   }
 }

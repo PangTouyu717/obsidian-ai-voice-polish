@@ -58,6 +58,36 @@ export class AudioRecorder {
     }
   }
 
+  /** 当前使用的 MIME 类型（跨 recorder 实例保存） */
+  private savedMimeType = "audio/webm";
+
+  /**
+   * 静默重启录音：保留已有 chunks，用新 stream 继续录。
+   * 用于 App 切回前台时恢复录音。
+   */
+  async recover(): Promise<void> {
+    // 停掉旧的 recorder（触发一次 ondataavailable 收尾）
+    if (this.mediaRecorder?.state === "recording") {
+      this.mediaRecorder.stop();
+    }
+    // 释放旧 stream
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    this.mediaRecorder = null;
+
+    // 新 stream
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.stream = stream;
+
+    // 新 recorder（沿用之前的 MIME 类型）
+    this.mediaRecorder = new MediaRecorder(stream, { mimeType: this.savedMimeType });
+    this.mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) this.chunks.push(event.data);
+    };
+    this.mediaRecorder.start(100);
+    this.startAudioPipeline(stream);
+  }
+
   /**
    * 开始录制
    * @throws 如果无法获取麦克风权限
@@ -95,6 +125,7 @@ export class AudioRecorder {
     );
 
     this.mediaRecorder = new MediaRecorder(stream, { mimeType });
+    this.savedMimeType = mimeType;
 
     this.mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {

@@ -1,6 +1,6 @@
 {
   "name": "obsidian-ai-voice-polish",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Obsidian plugin for AI-powered voice recording and text polishing",
   "main": "main.js",
   "scripts": {

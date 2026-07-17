@@ -36,8 +36,6 @@ export interface AiVoicePolishSettings {
   polishStyle: "formal" | "concise" | "casual" | "raw";
   /** 自定义润色指令（追加到系统 prompt 末尾） */
   customPrompt: string;
-  /** 是否自动插入（跳过预览） */
-  autoInsert: boolean;
 }
 
 export const DEFAULT_SETTINGS: AiVoicePolishSettings = {
@@ -52,7 +50,6 @@ export const DEFAULT_SETTINGS: AiVoicePolishSettings = {
   deepseekApiKey: "",
   polishStyle: "formal",
   customPrompt: "",
-  autoInsert: true,
 };
 
 export class AiVoicePolishSettingTab extends PluginSettingTab {
@@ -230,7 +227,7 @@ export class AiVoicePolishSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("音频存放文件夹")
-      .setDesc("录音音频 .webm 文件的存放路径")
+      .setDesc("录音音频文件的存放路径")
       .addText((text) =>
         text
           .setPlaceholder('默认 "voice"')
@@ -302,19 +299,10 @@ export class AiVoicePolishSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl)
-      .setName("自动插入")
-      .setDesc(
-        "开启后，润色完成直接插入笔记，跳过预览确认。关闭则会显示润色结果让你确认。"
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.autoInsert)
-          .onChange(async (value) => {
-            this.plugin.settings.autoInsert = value;
-            await this.plugin.saveSettings();
-          })
-      );
+    containerEl.createEl("p", {
+      text: "💡 录完即出文字，润色在后台自动完成，无需等待。",
+      cls: "setting-item-description",
+    });
   }
 
   /**

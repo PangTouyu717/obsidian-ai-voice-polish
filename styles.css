@@ -1,125 +1,12 @@
 /*
-
   AI Voice Polish — Obsidian Plugin Styles
 
   遵循 Obsidian 主题变量体系：
   - 使用 var() 引用主题色，保证明暗主题自适应
-  - 使用 --avp-* 自定义变量管理组件内间距
-
 */
 
 /* ──────────────────────────────────────────────
-   录制模态框
-   ────────────────────────────────────────────── */
-
-.avp-status-text {
-  margin: 0.5em 0 1em 0;
-  color: var(--text-muted);
-  font-size: 0.9em;
-}
-
-.avp-button-container {
-  display: flex;
-  justify-content: center;
-  margin: 1em 0;
-}
-
-.avp-record-btn {
-  padding: 0.6em 2em;
-  border-radius: 999px;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border: none;
-  font-size: 1.1em;
-  cursor: pointer;
-  transition: filter 0.2s ease;
-}
-
-.avp-record-btn:hover {
-  filter: brightness(1.15);
-}
-
-.avp-record-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* ──────────────────────────────────────────────
-   预览区域
-   ────────────────────────────────────────────── */
-
-.avp-preview-container {
-  margin-top: 1.5em;
-  border-top: 1px solid var(--background-modifier-border);
-  padding-top: 1em;
-}
-
-.avp-preview-container h3 {
-  margin: 0 0 0.5em 0;
-  font-size: 1em;
-  color: var(--text-normal);
-}
-
-.avp-textarea {
-  width: 100%;
-  padding: 0.6em;
-  border-radius: 6px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  color: var(--text-normal);
-  font-size: 0.9em;
-  line-height: 1.6;
-  resize: vertical;
-  box-sizing: border-box;
-}
-
-.avp-textarea:focus {
-  outline: none;
-  border-color: var(--interactive-accent);
-}
-
-/* ──────────────────────────────────────────────
-   操作行
-   ────────────────────────────────────────────── */
-
-.avp-action-row {
-  display: flex;
-  gap: 0.8em;
-  margin-top: 1em;
-  justify-content: flex-end;
-}
-
-.avp-insert-btn {
-  padding: 0.5em 1.2em;
-  border-radius: 6px;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border: none;
-  cursor: pointer;
-  transition: filter 0.2s ease;
-}
-
-.avp-insert-btn:hover {
-  filter: brightness(1.15);
-}
-
-.avp-rerecord-btn {
-  padding: 0.5em 1.2em;
-  border-radius: 6px;
-  background: var(--background-modifier-border);
-  color: var(--text-normal);
-  border: 1px solid var(--background-modifier-border-hover);
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.avp-rerecord-btn:hover {
-  background: var(--background-modifier-border-hover);
-}
-
-/* ──────────────────────────────────────────────
-   浮动录音条 — 类似 Windows 语音输入小浮窗
-   不阻塞其他交互，可随意拖动
+   浮动录音条 — 可拖动小浮窗
    ────────────────────────────────────────────── */
 
 .avp-floating-panel {
@@ -127,32 +14,31 @@
   display: none;              /* 默认隐藏，open() 时显示 */
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 8px 14px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
+  border-radius: 10px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
   z-index: var(--layer-notice);
   cursor: grab;
   user-select: none;
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
-  transition: box-shadow 0.15s ease;
 }
 
 .avp-floating-panel:hover {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
-/* 录音按钮 */
+/* 录音按钮（放大以便手机端触摸） */
 .avp-floating-mic {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: none;
   background: var(--interactive-accent);
   color: var(--text-on-accent);
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -174,19 +60,18 @@
 
 /* 模式切换按钮 */
 .avp-floating-mode {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: 6px;
   border: 1px solid var(--background-modifier-border);
   background: transparent;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: background 0.15s ease, color 0.15s ease;
   flex-shrink: 0;
   line-height: 1;
 }
@@ -199,7 +84,7 @@
 /* 状态文字 */
 .avp-floating-status {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
   min-width: 60px;
   text-align: center;
 }
@@ -207,32 +92,41 @@
 /* 录制时长 */
 .avp-floating-duration {
   color: var(--text-accent);
-  font-size: 12px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
-  min-width: 32px;
+  min-width: 36px;
   text-align: right;
+  font-weight: 600;
 }
 
-/* 关闭按钮 */
+/* 关闭按钮（放大以便手机端触摸） */
 .avp-floating-close {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   line-height: 1;
-  transition: background 0.15s ease;
-  flex-shrink: 0;
 }
 
 .avp-floating-close:hover {
   background: var(--background-modifier-border-hover);
   color: var(--text-normal);
+}
+
+/* 状态栏指示器 */
+.avp-status-bar-recording {
+  color: var(--text-error);
+  font-weight: 600;
+}
+
+.avp-status-bar-idle {
+  color: var(--text-muted);
 }

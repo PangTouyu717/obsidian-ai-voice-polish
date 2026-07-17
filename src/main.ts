@@ -1,13 +1,8 @@
 import {
-  App,
   Plugin,
-  PluginSettingTab,
-  Setting,
   Notice,
-  MarkdownView,
   addIcon,
 } from "obsidian";
-import { VoiceRecorderModal } from "./ui/modal";
 import { FloatingRecorder } from "./ui/floating-recorder";
 import {
   DEFAULT_SETTINGS,
@@ -21,12 +16,18 @@ const MIC_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
 export default class AiVoicePolishPlugin extends Plugin {
   settings: AiVoicePolishSettings;
   private floatingRecorder: FloatingRecorder | null = null;
+  /** 状态栏文本元素 */
+  statusBarItem: HTMLElement;
 
   async onload() {
     await this.loadSettings();
-    console.log("AI Voice Polish: onload started");
 
-    // 注册自定义麦克风图标（用于命令面板等场景）
+    // 状态栏指示器
+    this.statusBarItem = this.addStatusBarItem();
+    this.statusBarItem.addClass("avp-status-bar-idle");
+    this.statusBarItem.textContent = "🎙 待命";
+
+    // 注册自定义麦克风图标
     addIcon("avp-mic", MIC_ICON);
 
     // 创建浮动录音条（单例，只创建一次）
@@ -42,29 +43,17 @@ export default class AiVoicePolishPlugin extends Plugin {
       },
     });
 
-    // 命令：使用选区文本进行润色
-    this.addCommand({
-      id: "polish-selected-text",
-      name: "润色选中的文本",
-      callback: () => {
-        this.polishSelectedText();
-      },
-    });
-
     // 功能区图标（左侧 Ribbon）
     const ribbonIcon = this.addRibbonIcon("message-square", "AI Voice Polish", () => {
       this.openRecorder();
     });
     ribbonIcon.setAttribute("data-avp-ribbon", "true");
-    console.log("AI Voice Polish: ribbon icon added");
 
     // 设置面板
     this.addSettingTab(new AiVoicePolishSettingTab(this.app, this));
-    console.log("AI Voice Polish: onload complete");
   }
 
   onunload() {
-    // 销毁浮动录音条
     if (this.floatingRecorder) {
       this.floatingRecorder.destroy();
       this.floatingRecorder = null;
@@ -78,23 +67,12 @@ export default class AiVoicePolishPlugin extends Plugin {
     }
   }
 
-  /** 润色当前编辑器中选中的文本 */
-  async polishSelectedText() {
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-
-    if (!view) {
-      new Notice("没有打开的编辑器");
-      return;
-    }
-
-    const editor = view.editor;
-    const selectedText = editor.getSelection();
-    if (!selectedText) {
-      new Notice("请先选中要润色的文本");
-      return;
-    }
-
-    new Notice("润色功能将在后续版本实现");
+  /** 更新状态栏文本 */
+  setStatusBar(text: string, isRecording: boolean) {
+    if (!this.statusBarItem) return;
+    this.statusBarItem.textContent = text;
+    this.statusBarItem.removeClass("avp-status-bar-idle", "avp-status-bar-recording");
+    this.statusBarItem.addClass(isRecording ? "avp-status-bar-recording" : "avp-status-bar-idle");
   }
 
   async loadSettings() {
