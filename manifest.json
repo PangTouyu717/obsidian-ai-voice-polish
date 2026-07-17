@@ -1,7 +1,7 @@
 {
   "id": "ai-voice-polish",
   "name": "AI Voice Polish",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "minAppVersion": "1.5.0",
   "description": "语音录制 → AI 润色 → 插入笔记，一站式语音写作工作流。",
   "author": "Winslow",

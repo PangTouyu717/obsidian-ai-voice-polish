@@ -21,9 +21,6 @@ export class AudioRecorder {
   private chunks: Blob[] = [];
   private startTime = 0;
   private stream: MediaStream | null = null;
-  /** 静音 AudioContext（保持音频会话活跃，防止息屏中断） */
-  private silentAudio: AudioContext | null = null;
-
   /** 当前录制状态 */
   get state(): RecordingState {
     return this.mediaRecorder?.state ?? "inactive";
@@ -32,37 +29,6 @@ export class AudioRecorder {
   /** 是否有已收集的音频数据（息屏中断后仍有数据） */
   get hasData(): boolean {
     return this.chunks.length > 0;
-  }
-
-  /**
-   * 创建静音音频上下文，保持系统音频会话活跃
-   * 模仿原生 App 息屏后继续录音的行为
-   */
-  private keepAudioAlive(): void {
-    try {
-      const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtor) return;
-      this.silentAudio = new AudioCtor();
-      // 播放静音振荡器 → 系统知道"这个 App 在用音频"→ 不暂停 WebView
-      const osc = this.silentAudio.createOscillator();
-      const gain = this.silentAudio.createGain();
-      gain.gain.value = 0; // 完全静音
-      osc.connect(gain);
-      gain.connect(this.silentAudio.destination);
-      osc.start();
-    } catch {
-      // 不支持 AudioContext，忽略
-    }
-  }
-
-  /**
-   * 释放静音音频上下文
-   */
-  private stopAudioAlive(): void {
-    if (this.silentAudio) {
-      try { this.silentAudio.close(); } catch {}
-      this.silentAudio = null;
-    }
   }
 
   /**
@@ -112,9 +78,6 @@ export class AudioRecorder {
     // 频繁刷数据确保即使息屏中断，也不会丢失大段音频
     this.mediaRecorder.start(100);
     this.startTime = Date.now();
-
-    // 保持音频会话活跃（息屏后系统知道"App 在用麦克风"）
-    this.keepAudioAlive();
   }
 
   /**
@@ -192,13 +155,12 @@ export class AudioRecorder {
   }
 
   /**
-   * 释放麦克风和音频会话
+   * 释放麦克风
    */
   private cleanup(): void {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.mediaRecorder = null;
-    this.stopAudioAlive();
   }
 
   /** 取消录制（丢弃数据） */
@@ -211,6 +173,5 @@ export class AudioRecorder {
     this.stream = null;
     this.mediaRecorder = null;
     this.chunks = [];
-    this.stopAudioAlive();
   }
 }

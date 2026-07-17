@@ -34,8 +34,6 @@ var AudioRecorder = class {
     this.chunks = [];
     this.startTime = 0;
     this.stream = null;
-    /** 静音 AudioContext（保持音频会话活跃，防止息屏中断） */
-    this.silentAudio = null;
   }
   /** 当前录制状态 */
   get state() {
@@ -45,37 +43,6 @@ var AudioRecorder = class {
   /** 是否有已收集的音频数据（息屏中断后仍有数据） */
   get hasData() {
     return this.chunks.length > 0;
-  }
-  /**
-   * 创建静音音频上下文，保持系统音频会话活跃
-   * 模仿原生 App 息屏后继续录音的行为
-   */
-  keepAudioAlive() {
-    try {
-      const AudioCtor = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtor)
-        return;
-      this.silentAudio = new AudioCtor();
-      const osc = this.silentAudio.createOscillator();
-      const gain = this.silentAudio.createGain();
-      gain.gain.value = 0;
-      osc.connect(gain);
-      gain.connect(this.silentAudio.destination);
-      osc.start();
-    } catch (e) {
-    }
-  }
-  /**
-   * 释放静音音频上下文
-   */
-  stopAudioAlive() {
-    if (this.silentAudio) {
-      try {
-        this.silentAudio.close();
-      } catch (e) {
-      }
-      this.silentAudio = null;
-    }
   }
   /**
    * 开始录制
@@ -111,7 +78,6 @@ var AudioRecorder = class {
     };
     this.mediaRecorder.start(100);
     this.startTime = Date.now();
-    this.keepAudioAlive();
   }
   /**
    * 停止录制并返回音频数据
@@ -178,14 +144,13 @@ var AudioRecorder = class {
     });
   }
   /**
-   * 释放麦克风和音频会话
+   * 释放麦克风
    */
   cleanup() {
     var _a;
     (_a = this.stream) == null ? void 0 : _a.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.mediaRecorder = null;
-    this.stopAudioAlive();
   }
   /** 取消录制（丢弃数据） */
   cancel() {
@@ -198,7 +163,6 @@ var AudioRecorder = class {
     this.stream = null;
     this.mediaRecorder = null;
     this.chunks = [];
-    this.stopAudioAlive();
   }
 };
 
