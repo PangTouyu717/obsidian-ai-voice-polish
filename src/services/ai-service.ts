@@ -1,12 +1,14 @@
 /**
  * DeepSeek 文本润色服务
  *
- * 调 DeepSeek Chat API 对语音转文字结果进行润色。
- * DeepSeek API 兼容 OpenAI 格式，只需改 endpoint 和模型名。
+ * 用 Obsidian 的 requestUrl API 代替 fetch，
+ * 解决手机端 CORS 拦截问题（failed to fetch）。
  *
  * API: https://api.deepseek.com/v1/chat/completions
  * 模型: deepseek-chat
  */
+
+import { requestUrl } from "obsidian";
 
 export interface PolishResult {
   original: string;
@@ -32,40 +34,11 @@ function styleInstruction(style: PolishStyle): string {
   return map[style] ?? map.formal;
 }
 
-/** 润色超时（毫秒）— 60 秒，手机上网络可能较慢 */
-const POLISH_TIMEOUT = 60000;
-
 /**
- * 带超时的 fetch
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit,
-  timeoutMs = 30000
-): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    return response;
-  } catch (err) {
-    if ((err as Error).name === "AbortError") {
-      throw new Error(`请求超时（${timeoutMs / 1000}秒）`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/**
- * 调 DeepSeek 润色文本（单次调用，不重试）
+ * 调 DeepSeek 润色文本
  *
- * 润色失败不影响主流程——由调用方 fallback 到原文。
- * 不重试、不等待，最快速度返回结果或抛错。
+ * 使用 Obsidian 的 requestUrl 绕过 CORS 限制，
+ * 手机端和桌面端都能正常工作。
  *
  * @param apiKey DeepSeek API Key
  * @param text 原始文本
@@ -88,33 +61,31 @@ export async function polishText(
 - 只输出润色后的文本，不要加解释、不要加引号
 ${extraInstructions ? `额外指示：${extraInstructions}` : ""}`;
 
-  const response = await fetchWithTimeout(
-    "https://api.deepseek.com/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: text },
-        ],
-        temperature: 0.5,
-        max_tokens: 1024,
-      }),
-    },
-    POLISH_TIMEOUT
-  );
+  const body = {
+    model: "deepseek-chat",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: text },
+    ],
+    temperature: 0.5,
+    max_tokens: 1024,
+  };
 
-  if (!response.ok) {
-    const err = await response.text();
+  const response = await requestUrl({
+    url: "https://api.deepseek.com/v1/chat/completions",
+    method: "POST",
+    contentType: "application/json",
+    body: JSON.stringify(body),
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+
+  if (response.status !== 200) {
     throw new Error(`DeepSeek API 错误 (${response.status})`);
   }
 
-  const data = await response.json();
+  const data = response.json;
 
   return {
     original: text,
@@ -131,12 +102,10 @@ export async function testDeepSeekConnection(
   apiKey: string
 ): Promise<{ ok: boolean; message: string }> {
   try {
-    const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    const response = await requestUrl({
+      url: "https://api.deepseek.com/v1/chat/completions",
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      contentType: "application/json",
       body: JSON.stringify({
         model: "deepseek-chat",
         messages: [
@@ -144,18 +113,21 @@ export async function testDeepSeekConnection(
         ],
         max_tokens: 5,
       }),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
     });
 
-    if (response.ok) {
+    if (response.status === 200) {
       return { ok: true, message: "DeepSeek API 连接正常 ✅" };
     }
 
-    const err = await response.text();
-    if (response.status === 401) {
+    return { ok: false, message: `连接失败 (${response.status})` };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("401") || msg.includes("Unauthorized")) {
       return { ok: false, message: "API Key 无效，请检查是否正确" };
     }
-    return { ok: false, message: `连接失败 (${response.status}): ${err.slice(0, 100)}` };
-  } catch (err) {
-    return { ok: false, message: `网络错误: ${err}` };
+    return { ok: false, message: `网络错误: ${msg}` };
   }
 }
