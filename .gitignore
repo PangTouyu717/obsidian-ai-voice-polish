@@ -1,5 +1,4 @@
-# Build output
-/main.js
+# Build output (only main.js.map — main.js is committed for plugin distribution)
 /main.js.map
 
 # Dependencies
