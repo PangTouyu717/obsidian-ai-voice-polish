@@ -166,6 +166,15 @@ export class FloatingRecorder {
   private async handleMicClick() {
     switch (this.state) {
       case "idle":
+        if (this.mode === "insert") {
+          // 插入模式：录音前先检查光标是否在有效位置
+          const target = this.savedTarget;
+          if (!target || !this.isValidTarget(target)) {
+            new Notice("⚠️ 插入模式就绪失败：请先把光标放到要输入的位置，再点击录音");
+            return;
+          }
+          new Notice("✅ 插入模式已就绪，光标已定位");
+        }
         await this.startRecording();
         break;
       case "recording":
@@ -175,6 +184,24 @@ export class FloatingRecorder {
         this.resetAll();
         break;
     }
+  }
+
+  /** 判断目标是否是可插入文本的有效元素 */
+  private isValidTarget(target: HTMLElement): boolean {
+    // input / textarea
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+      return true;
+    }
+    // contentEditable（含 CodeMirror 等富文本编辑器）
+    if ((target as HTMLElement).isContentEditable) {
+      return true;
+    }
+    // Obsidian Markdown 编辑器
+    const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    if (view) {
+      return true;
+    }
+    return false;
   }
 
   private async startRecording() {
