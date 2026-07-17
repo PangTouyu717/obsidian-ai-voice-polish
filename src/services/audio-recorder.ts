@@ -50,14 +50,15 @@ export class AudioRecorder {
     this.stream = stream;
     this.chunks = [];
 
-    // 用更完整的 MIME 类型列表，匹配 whisper 插件
+    // MIME 类型优先级：mp4 优先，因为它有完整的时长元数据
+    // 手机端和桌面端都支持 mp4，且播放器能显示进度条和拖动
     const priority = [
+      "audio/mp4",
+      "audio/mp4;codecs=mp4a.40.2",
       "audio/webm;codecs=opus",
       "audio/webm",
       "audio/ogg;codecs=opus",
       "audio/ogg",
-      "audio/mp4",
-      "audio/mp4;codecs=mp4a.40.2",
       "audio/aac",
       "audio/wav",
     ];

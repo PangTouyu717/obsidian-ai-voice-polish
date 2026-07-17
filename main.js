@@ -58,12 +58,12 @@ var AudioRecorder = class {
     this.stream = stream;
     this.chunks = [];
     const priority = [
+      "audio/mp4",
+      "audio/mp4;codecs=mp4a.40.2",
       "audio/webm;codecs=opus",
       "audio/webm",
       "audio/ogg;codecs=opus",
       "audio/ogg",
-      "audio/mp4",
-      "audio/mp4;codecs=mp4a.40.2",
       "audio/aac",
       "audio/wav"
     ];
