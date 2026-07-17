@@ -209,17 +209,20 @@ export class FloatingRecorder {
     return false;
   }
 
-  /** 息屏检测处理器（用于清理） */
+  /** 息屏检测处理器 */
   private onVisibilityChange = () => {
     if (document.visibilityState === "hidden" && this.state === "recording") {
-      new Notice("⏺ 录音在后台继续运行");
+      new Notice("⏺ 录音仍在进行");
     } else if (document.visibilityState === "visible" && this.state === "recording") {
-      // 亮屏后检测录音是否还活着
-      if (this.recorder.state === "inactive" && this.recorder.hasData) {
-        new Notice("🔁 检测到录音中断，正在处理已录制的音频...");
-        this.stopRecording();
-      } else if (this.recorder.state === "recording") {
-        new Notice("✅ 录音一切正常");
+      if (this.recorder.state === "recording") {
+        new Notice("✅ 录音正常");
+      } else if (this.recorder.state === "inactive") {
+        // 录音在息屏期间停止了
+        // 不自动停止，让用户自己点停止来处理已有数据
+        new Notice("⏸ 录音在息屏时已中断，点停止获取已录制的内容");
+        this.micBtn.style.background = "orange";
+        this.micBtn.style.color = "white";
+        this.statusEl.textContent = "录音已中断，点击停止";
       }
     }
   };

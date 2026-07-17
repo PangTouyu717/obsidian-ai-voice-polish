@@ -584,16 +584,18 @@ var _FloatingRecorder = class _FloatingRecorder {
     // 计时
     this.durationTimer = null;
     this.recordStartTime = 0;
-    /** 息屏检测处理器（用于清理） */
+    /** 息屏检测处理器 */
     this.onVisibilityChange = () => {
       if (document.visibilityState === "hidden" && this.state === "recording") {
-        new import_obsidian2.Notice("\u23FA \u5F55\u97F3\u5728\u540E\u53F0\u7EE7\u7EED\u8FD0\u884C");
+        new import_obsidian2.Notice("\u23FA \u5F55\u97F3\u4ECD\u5728\u8FDB\u884C");
       } else if (document.visibilityState === "visible" && this.state === "recording") {
-        if (this.recorder.state === "inactive" && this.recorder.hasData) {
-          new import_obsidian2.Notice("\u{1F501} \u68C0\u6D4B\u5230\u5F55\u97F3\u4E2D\u65AD\uFF0C\u6B63\u5728\u5904\u7406\u5DF2\u5F55\u5236\u7684\u97F3\u9891...");
-          this.stopRecording();
-        } else if (this.recorder.state === "recording") {
-          new import_obsidian2.Notice("\u2705 \u5F55\u97F3\u4E00\u5207\u6B63\u5E38");
+        if (this.recorder.state === "recording") {
+          new import_obsidian2.Notice("\u2705 \u5F55\u97F3\u6B63\u5E38");
+        } else if (this.recorder.state === "inactive") {
+          new import_obsidian2.Notice("\u23F8 \u5F55\u97F3\u5728\u606F\u5C4F\u65F6\u5DF2\u4E2D\u65AD\uFF0C\u70B9\u505C\u6B62\u83B7\u53D6\u5DF2\u5F55\u5236\u7684\u5185\u5BB9");
+          this.micBtn.style.background = "orange";
+          this.micBtn.style.color = "white";
+          this.statusEl.textContent = "\u5F55\u97F3\u5DF2\u4E2D\u65AD\uFF0C\u70B9\u51FB\u505C\u6B62";
         }
       }
     };
