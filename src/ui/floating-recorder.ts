@@ -395,9 +395,10 @@ export class FloatingRecorder {
         new Notice("✅ 润色完成");
       }
     } catch (err) {
-      // 润色失败：通知用户，但原文已经插入，不影响使用
-      console.error("润色失败:", err);
-      new Notice(`ℹ️ 润色未完成（已保留原文）`);
+      // 润色失败：通知用户具体原因，但原文已经插入，不影响使用
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error("润色失败:", reason);
+      new Notice(`ℹ️ 润色未完成: ${reason}`);
     }
   }
 

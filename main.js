@@ -537,6 +537,11 @@ async function fetchWithTimeout(url, options, timeoutMs = 3e4) {
       signal: controller.signal
     });
     return response;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(`\u8BF7\u6C42\u8D85\u65F6\uFF08${timeoutMs / 1e3}\u79D2\uFF09`);
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -898,8 +903,9 @@ var _FloatingRecorder = class _FloatingRecorder {
         new import_obsidian.Notice("\u2705 \u6DA6\u8272\u5B8C\u6210");
       }
     } catch (err) {
-      console.error("\u6DA6\u8272\u5931\u8D25:", err);
-      new import_obsidian.Notice(`\u2139\uFE0F \u6DA6\u8272\u672A\u5B8C\u6210\uFF08\u5DF2\u4FDD\u7559\u539F\u6587\uFF09`);
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error("\u6DA6\u8272\u5931\u8D25:", reason);
+      new import_obsidian.Notice(`\u2139\uFE0F \u6DA6\u8272\u672A\u5B8C\u6210: ${reason}`);
     }
   }
   // ── 插入到光标位置 ──────────────────────────

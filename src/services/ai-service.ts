@@ -51,6 +51,11 @@ async function fetchWithTimeout(
       signal: controller.signal,
     });
     return response;
+  } catch (err) {
+    if ((err as Error).name === "AbortError") {
+      throw new Error(`请求超时（${timeoutMs / 1000}秒）`);
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }
