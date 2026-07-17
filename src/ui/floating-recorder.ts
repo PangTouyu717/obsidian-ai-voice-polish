@@ -541,16 +541,20 @@ export class FloatingRecorder {
         }
         await this.plugin.app.vault.rename(todayNotes[i], newPath);
 
-        // 同步重命名日期文件夹下的音频
-        const oldAudioPath = `${audioDir}/${fileDate}-${pad(oldNum)}.webm`;
-        const oldAudio = allFiles.find((f) => f.path === oldAudioPath);
-        if (oldAudio) {
-          const newAudioPath = `${audioDir}/${fileDate}-${pad(newNum)}.webm`;
-          const existingAudio = this.plugin.app.vault.getAbstractFileByPath(newAudioPath);
-          if (existingAudio instanceof TFile && existingAudio.path !== oldAudio.path) {
-            await this.plugin.app.vault.delete(existingAudio);
+        // 同步重命名日期文件夹下的音频（支持多种扩展名）
+        const audioExts = ["webm", "mp4", "ogg", "wav", "aac", "mp3"];
+        for (const ext of audioExts) {
+          const oldAudioPath = `${audioDir}/${fileDate}-${pad(oldNum)}.${ext}`;
+          const oldAudio = allFiles.find((f) => f.path === oldAudioPath);
+          if (oldAudio) {
+            const newAudioPath = `${audioDir}/${fileDate}-${pad(newNum)}.${ext}`;
+            const existingAudio = this.plugin.app.vault.getAbstractFileByPath(newAudioPath);
+            if (existingAudio instanceof TFile && existingAudio.path !== oldAudio.path) {
+              await this.plugin.app.vault.delete(existingAudio);
+            }
+            await this.plugin.app.vault.rename(oldAudio, newAudioPath);
+            break; // 找到对应扩展名后停止
           }
-          await this.plugin.app.vault.rename(oldAudio, newAudioPath);
         }
       }
 
@@ -559,7 +563,9 @@ export class FloatingRecorder {
 
       // 2) 保存音频到 {audioDir}/
       if (this.lastAudioBlob) {
-        const audioPath = `${audioDir}/${baseName}.webm`;
+        // 从 MIME 类型推断正确扩展名，保证播放器能识别
+        const ext = this.getAudioExtension(this.lastAudioBlob.type);
+        const audioPath = `${audioDir}/${baseName}.${ext}`;
         // 确保日期文件夹存在
         const audioDirObj = this.plugin.app.vault.getAbstractFileByPath(audioDir);
         if (!audioDirObj) {
@@ -572,39 +578,61 @@ export class FloatingRecorder {
         }
         const buffer = await this.lastAudioBlob.arrayBuffer();
         await this.plugin.app.vault.createBinary(audioPath, buffer);
+
+        // 3) 创建笔记到 {noteDir}/
+        const notePath = `${noteDir}/${baseName}.md`;
+        // 确保笔记日期文件夹存在
+        const noteDirObj = this.plugin.app.vault.getAbstractFileByPath(noteDir);
+        if (!noteDirObj) {
+          await this.plugin.app.vault.createFolder(noteDir);
+        }
+        // 删旧笔记避免冲突
+        const oldNote = this.plugin.app.vault.getAbstractFileByPath(notePath);
+        if (oldNote instanceof TFile) {
+          await this.plugin.app.vault.delete(oldNote);
+        }
+
+        const audioEmbed = `\n![[${audioPath}]]\n`;
+        const noteContent = `${baseName}\n\n#voice/${fileDate}\n${audioEmbed}\n\n${text}\n`;
+        const noteFile = await this.plugin.app.vault.create(notePath, noteContent);
+
+        // 4) 打开笔记
+        const leaf = this.plugin.app.workspace.getLeaf(false);
+        await leaf.openFile(noteFile);
+
+        new Notice(`✅ 已创建语音笔记`);
+      } else {
+        // 没有音频文件（理论上不会发生）
+        const notePath = `${noteDir}/${baseName}.md`;
+        const noteDirObj = this.plugin.app.vault.getAbstractFileByPath(noteDir);
+        if (!noteDirObj) {
+          await this.plugin.app.vault.createFolder(noteDir);
+        }
+        const oldNote = this.plugin.app.vault.getAbstractFileByPath(notePath);
+        if (oldNote instanceof TFile) {
+          await this.plugin.app.vault.delete(oldNote);
+        }
+        const noteContent = `${baseName}\n\n#voice/${fileDate}\n\n${text}\n`;
+        const noteFile = await this.plugin.app.vault.create(notePath, noteContent);
+        const leaf = this.plugin.app.workspace.getLeaf(false);
+        await leaf.openFile(noteFile);
+        new Notice(`✅ 已创建语音笔记`);
       }
-
-      // 3) 创建笔记到 {noteDir}/
-      const notePath = `${noteDir}/${baseName}.md`;
-      // 确保笔记日期文件夹存在
-      const noteDirObj = this.plugin.app.vault.getAbstractFileByPath(noteDir);
-      if (!noteDirObj) {
-        await this.plugin.app.vault.createFolder(noteDir);
-      }
-      // 删旧笔记避免冲突
-      const oldNote = this.plugin.app.vault.getAbstractFileByPath(notePath);
-      if (oldNote instanceof TFile) {
-        await this.plugin.app.vault.delete(oldNote);
-      }
-
-      const audioPathFull = this.lastAudioBlob
-        ? `${audioDir}/${baseName}.webm`
-        : "";
-      const audioEmbed = audioPathFull
-        ? `\n![[${audioPathFull}]]\n`
-        : "";
-      const noteContent = `${baseName}\n\n#voice/${fileDate}\n${audioEmbed}\n\n${text}\n`;
-      const noteFile = await this.plugin.app.vault.create(notePath, noteContent);
-
-      // 4) 打开笔记
-      const leaf = this.plugin.app.workspace.getLeaf(false);
-      await leaf.openFile(noteFile);
-
-      new Notice(`✅ 已创建语音笔记`);
     } catch (err) {
       new Notice(`❌ 创建笔记失败: ${err}`);
     }
     this.close();
+  }
+
+  /** 从 MIME 类型推断音频文件扩展名 */
+  private getAudioExtension(mimeType: string): string {
+    const mime = mimeType.toLowerCase();
+    if (mime.includes("mp4") || mime.includes("m4a")) return "mp4";
+    if (mime.includes("ogg")) return "ogg";
+    if (mime.includes("wav")) return "wav";
+    if (mime.includes("aac")) return "aac";
+    if (mime.includes("mp3")) return "mp3";
+    return "webm"; // 默认
   }
 
   /** 从文件名提取序号，如 "2026-07-17-02.md" → 2 */

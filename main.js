@@ -965,21 +965,26 @@ var _FloatingRecorder = class _FloatingRecorder {
           await this.plugin.app.vault.delete(existing);
         }
         await this.plugin.app.vault.rename(todayNotes[i], newPath);
-        const oldAudioPath = `${audioDir}/${fileDate}-${pad(oldNum)}.webm`;
-        const oldAudio = allFiles.find((f) => f.path === oldAudioPath);
-        if (oldAudio) {
-          const newAudioPath = `${audioDir}/${fileDate}-${pad(newNum)}.webm`;
-          const existingAudio = this.plugin.app.vault.getAbstractFileByPath(newAudioPath);
-          if (existingAudio instanceof import_obsidian2.TFile && existingAudio.path !== oldAudio.path) {
-            await this.plugin.app.vault.delete(existingAudio);
+        const audioExts = ["webm", "mp4", "ogg", "wav", "aac", "mp3"];
+        for (const ext of audioExts) {
+          const oldAudioPath = `${audioDir}/${fileDate}-${pad(oldNum)}.${ext}`;
+          const oldAudio = allFiles.find((f) => f.path === oldAudioPath);
+          if (oldAudio) {
+            const newAudioPath = `${audioDir}/${fileDate}-${pad(newNum)}.${ext}`;
+            const existingAudio = this.plugin.app.vault.getAbstractFileByPath(newAudioPath);
+            if (existingAudio instanceof import_obsidian2.TFile && existingAudio.path !== oldAudio.path) {
+              await this.plugin.app.vault.delete(existingAudio);
+            }
+            await this.plugin.app.vault.rename(oldAudio, newAudioPath);
+            break;
           }
-          await this.plugin.app.vault.rename(oldAudio, newAudioPath);
         }
       }
       const nextNum = pad(todayNotes.length + 1);
       const baseName = `${fileDate}-${nextNum}`;
       if (this.lastAudioBlob) {
-        const audioPath = `${audioDir}/${baseName}.webm`;
+        const ext = this.getAudioExtension(this.lastAudioBlob.type);
+        const audioPath = `${audioDir}/${baseName}.${ext}`;
         const audioDirObj = this.plugin.app.vault.getAbstractFileByPath(audioDir);
         if (!audioDirObj) {
           await this.plugin.app.vault.createFolder(audioDir);
@@ -990,35 +995,69 @@ var _FloatingRecorder = class _FloatingRecorder {
         }
         const buffer = await this.lastAudioBlob.arrayBuffer();
         await this.plugin.app.vault.createBinary(audioPath, buffer);
-      }
-      const notePath = `${noteDir}/${baseName}.md`;
-      const noteDirObj = this.plugin.app.vault.getAbstractFileByPath(noteDir);
-      if (!noteDirObj) {
-        await this.plugin.app.vault.createFolder(noteDir);
-      }
-      const oldNote = this.plugin.app.vault.getAbstractFileByPath(notePath);
-      if (oldNote instanceof import_obsidian2.TFile) {
-        await this.plugin.app.vault.delete(oldNote);
-      }
-      const audioPathFull = this.lastAudioBlob ? `${audioDir}/${baseName}.webm` : "";
-      const audioEmbed = audioPathFull ? `
-![[${audioPathFull}]]
-` : "";
-      const noteContent = `${baseName}
+        const notePath = `${noteDir}/${baseName}.md`;
+        const noteDirObj = this.plugin.app.vault.getAbstractFileByPath(noteDir);
+        if (!noteDirObj) {
+          await this.plugin.app.vault.createFolder(noteDir);
+        }
+        const oldNote = this.plugin.app.vault.getAbstractFileByPath(notePath);
+        if (oldNote instanceof import_obsidian2.TFile) {
+          await this.plugin.app.vault.delete(oldNote);
+        }
+        const audioEmbed = `
+![[${audioPath}]]
+`;
+        const noteContent = `${baseName}
 
 #voice/${fileDate}
 ${audioEmbed}
 
 ${text}
 `;
-      const noteFile = await this.plugin.app.vault.create(notePath, noteContent);
-      const leaf = this.plugin.app.workspace.getLeaf(false);
-      await leaf.openFile(noteFile);
-      new import_obsidian2.Notice(`\u2705 \u5DF2\u521B\u5EFA\u8BED\u97F3\u7B14\u8BB0`);
+        const noteFile = await this.plugin.app.vault.create(notePath, noteContent);
+        const leaf = this.plugin.app.workspace.getLeaf(false);
+        await leaf.openFile(noteFile);
+        new import_obsidian2.Notice(`\u2705 \u5DF2\u521B\u5EFA\u8BED\u97F3\u7B14\u8BB0`);
+      } else {
+        const notePath = `${noteDir}/${baseName}.md`;
+        const noteDirObj = this.plugin.app.vault.getAbstractFileByPath(noteDir);
+        if (!noteDirObj) {
+          await this.plugin.app.vault.createFolder(noteDir);
+        }
+        const oldNote = this.plugin.app.vault.getAbstractFileByPath(notePath);
+        if (oldNote instanceof import_obsidian2.TFile) {
+          await this.plugin.app.vault.delete(oldNote);
+        }
+        const noteContent = `${baseName}
+
+#voice/${fileDate}
+
+${text}
+`;
+        const noteFile = await this.plugin.app.vault.create(notePath, noteContent);
+        const leaf = this.plugin.app.workspace.getLeaf(false);
+        await leaf.openFile(noteFile);
+        new import_obsidian2.Notice(`\u2705 \u5DF2\u521B\u5EFA\u8BED\u97F3\u7B14\u8BB0`);
+      }
     } catch (err) {
       new import_obsidian2.Notice(`\u274C \u521B\u5EFA\u7B14\u8BB0\u5931\u8D25: ${err}`);
     }
     this.close();
+  }
+  /** 从 MIME 类型推断音频文件扩展名 */
+  getAudioExtension(mimeType) {
+    const mime = mimeType.toLowerCase();
+    if (mime.includes("mp4") || mime.includes("m4a"))
+      return "mp4";
+    if (mime.includes("ogg"))
+      return "ogg";
+    if (mime.includes("wav"))
+      return "wav";
+    if (mime.includes("aac"))
+      return "aac";
+    if (mime.includes("mp3"))
+      return "mp3";
+    return "webm";
   }
   /** 从文件名提取序号，如 "2026-07-17-02.md" → 2 */
   extractNum(fileName) {
