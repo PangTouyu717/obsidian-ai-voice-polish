@@ -302,18 +302,35 @@ export class FloatingRecorder {
         this.resetAll();
         return;
       }
-      await this.doPolish();
+
+      // 先插原文 → 用户立刻看到文字，不等待润色
+      await this.insertRawText();
+      // 关闭浮窗，返回正常编辑状态
+      this.close();
+
+      // 后台润色
+      this.backgroundPolish();
     } catch (err) {
       new Notice(`[E201] 语音识别失败: ${err}`);
       this.resetAll();
     }
   }
 
-  // ── 润色 ────────────────────────────────────
+  /** 立刻插入原文（不等待润色） */
+  private async insertRawText() {
+    const text = this.rawText || this.polishedText;
+    if (!text) return;
 
-  private async doPolish() {
+    if (this.mode === "note") {
+      await this.createNoteWithAudio(text);
+    } else {
+      await this.insertTextAtCursor(text);
+    }
+  }
+
+  /** 后台润色：成功就替换原文，失败就保留原文 */
+  private async backgroundPolish() {
     this.state = "polishing";
-    this.statusEl.textContent = "润色中...";
 
     try {
       const result = await polishText(
@@ -322,12 +339,33 @@ export class FloatingRecorder {
         this.plugin.settings.polishStyle as PolishStyle,
         this.plugin.settings.customPrompt || undefined
       );
-      this.polishedText = result.polished;
-      await this.insertToTarget();
-    } catch (err) {
-      new Notice(`[E301] 润色失败: ${err}`);
-      this.polishedText = this.rawText;
-      await this.insertToTarget();
+
+      if (!result.polished || result.polished === this.rawText) return;
+
+      // 尝试替换当前编辑器里的原文
+      const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+      if (view) {
+        const editor = view.editor;
+        const content = editor.getValue();
+        const idx = content.lastIndexOf(this.rawText);
+        if (idx !== -1) {
+          const from = editor.offsetToPos(idx);
+          const to = editor.offsetToPos(idx + this.rawText.length);
+          editor.replaceRange(result.polished, from, to);
+          new Notice("✅ 润色已完成");
+          return;
+        }
+      }
+
+      // 找不到原文 → 把润色结果放剪贴板
+      try {
+        await navigator.clipboard.writeText(result.polished);
+        new Notice("✅ 润色完成（已复制到剪贴板）");
+      } catch {
+        new Notice("✅ 润色完成");
+      }
+    } catch {
+      // 润色失败，原文已经插入了，不需要做任何事
     }
   }
 

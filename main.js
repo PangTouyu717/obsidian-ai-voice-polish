@@ -831,16 +831,28 @@ var _FloatingRecorder = class _FloatingRecorder {
         this.resetAll();
         return;
       }
-      await this.doPolish();
+      await this.insertRawText();
+      this.close();
+      this.backgroundPolish();
     } catch (err) {
       new import_obsidian.Notice(`[E201] \u8BED\u97F3\u8BC6\u522B\u5931\u8D25: ${err}`);
       this.resetAll();
     }
   }
-  // ── 润色 ────────────────────────────────────
-  async doPolish() {
+  /** 立刻插入原文（不等待润色） */
+  async insertRawText() {
+    const text = this.rawText || this.polishedText;
+    if (!text)
+      return;
+    if (this.mode === "note") {
+      await this.createNoteWithAudio(text);
+    } else {
+      await this.insertTextAtCursor(text);
+    }
+  }
+  /** 后台润色：成功就替换原文，失败就保留原文 */
+  async backgroundPolish() {
     this.state = "polishing";
-    this.statusEl.textContent = "\u6DA6\u8272\u4E2D...";
     try {
       const result = await polishText(
         this.plugin.settings.deepseekApiKey,
@@ -848,12 +860,28 @@ var _FloatingRecorder = class _FloatingRecorder {
         this.plugin.settings.polishStyle,
         this.plugin.settings.customPrompt || void 0
       );
-      this.polishedText = result.polished;
-      await this.insertToTarget();
-    } catch (err) {
-      new import_obsidian.Notice(`[E301] \u6DA6\u8272\u5931\u8D25: ${err}`);
-      this.polishedText = this.rawText;
-      await this.insertToTarget();
+      if (!result.polished || result.polished === this.rawText)
+        return;
+      const view = this.plugin.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
+      if (view) {
+        const editor = view.editor;
+        const content = editor.getValue();
+        const idx = content.lastIndexOf(this.rawText);
+        if (idx !== -1) {
+          const from = editor.offsetToPos(idx);
+          const to = editor.offsetToPos(idx + this.rawText.length);
+          editor.replaceRange(result.polished, from, to);
+          new import_obsidian.Notice("\u2705 \u6DA6\u8272\u5DF2\u5B8C\u6210");
+          return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(result.polished);
+        new import_obsidian.Notice("\u2705 \u6DA6\u8272\u5B8C\u6210\uFF08\u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F\uFF09");
+      } catch (e) {
+        new import_obsidian.Notice("\u2705 \u6DA6\u8272\u5B8C\u6210");
+      }
+    } catch (e) {
     }
   }
   // ── 插入到光标位置 ──────────────────────────
