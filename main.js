@@ -34,18 +34,8 @@ var AudioRecorder = class {
     this.chunks = [];
     this.startTime = 0;
     this.stream = null;
-    this.wakeLock = null;
-    /**
-     * 页面可见性变化时重新请求 Wake Lock
-     */
-    this.handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && this.state === "recording") {
-        navigator.wakeLock.request("screen").then((wl) => {
-          this.wakeLock = wl;
-        }).catch(() => {
-        });
-      }
-    };
+    /** 静音 AudioContext（保持音频会话活跃，防止息屏中断） */
+    this.silentAudio = null;
   }
   /** 当前录制状态 */
   get state() {
@@ -57,30 +47,34 @@ var AudioRecorder = class {
     return this.chunks.length > 0;
   }
   /**
-   * 请求屏幕常亮（防止息屏导致录音中断）
-   * 幂等：重复调用不会重复添加监听器
+   * 创建静音音频上下文，保持系统音频会话活跃
+   * 模仿原生 App 息屏后继续录音的行为
    */
-  async requestWakeLock() {
+  keepAudioAlive() {
     try {
-      if ("wakeLock" in navigator) {
-        document.removeEventListener("visibilitychange", this.handleVisibilityChange);
-        this.wakeLock = await navigator.wakeLock.request("screen");
-        document.addEventListener("visibilitychange", this.handleVisibilityChange);
-      }
+      const AudioCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtor)
+        return;
+      this.silentAudio = new AudioCtor();
+      const osc = this.silentAudio.createOscillator();
+      const gain = this.silentAudio.createGain();
+      gain.gain.value = 0;
+      osc.connect(gain);
+      gain.connect(this.silentAudio.destination);
+      osc.start();
     } catch (e) {
     }
   }
   /**
-   * 释放屏幕常亮
+   * 释放静音音频上下文
    */
-  async releaseWakeLock() {
-    document.removeEventListener("visibilitychange", this.handleVisibilityChange);
-    if (this.wakeLock) {
+  stopAudioAlive() {
+    if (this.silentAudio) {
       try {
-        await this.wakeLock.release();
+        this.silentAudio.close();
       } catch (e) {
       }
-      this.wakeLock = null;
+      this.silentAudio = null;
     }
   }
   /**
@@ -117,7 +111,7 @@ var AudioRecorder = class {
     };
     this.mediaRecorder.start(100);
     this.startTime = Date.now();
-    this.requestWakeLock();
+    this.keepAudioAlive();
   }
   /**
    * 停止录制并返回音频数据
@@ -184,14 +178,14 @@ var AudioRecorder = class {
     });
   }
   /**
-   * 释放麦克风和 Wake Lock
+   * 释放麦克风和音频会话
    */
   cleanup() {
     var _a;
     (_a = this.stream) == null ? void 0 : _a.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.mediaRecorder = null;
-    this.releaseWakeLock();
+    this.stopAudioAlive();
   }
   /** 取消录制（丢弃数据） */
   cancel() {
@@ -204,7 +198,7 @@ var AudioRecorder = class {
     this.stream = null;
     this.mediaRecorder = null;
     this.chunks = [];
-    this.releaseWakeLock();
+    this.stopAudioAlive();
   }
 };
 

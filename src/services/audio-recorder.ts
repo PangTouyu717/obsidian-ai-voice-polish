@@ -21,7 +21,8 @@ export class AudioRecorder {
   private chunks: Blob[] = [];
   private startTime = 0;
   private stream: MediaStream | null = null;
-  private wakeLock: WakeLockSentinel | null = null;
+  /** 静音 AudioContext（保持音频会话活跃，防止息屏中断） */
+  private silentAudio: AudioContext | null = null;
 
   /** 当前录制状态 */
   get state(): RecordingState {
@@ -34,48 +35,35 @@ export class AudioRecorder {
   }
 
   /**
-   * 请求屏幕常亮（防止息屏导致录音中断）
-   * 幂等：重复调用不会重复添加监听器
+   * 创建静音音频上下文，保持系统音频会话活跃
+   * 模仿原生 App 息屏后继续录音的行为
    */
-  private async requestWakeLock(): Promise<void> {
+  private keepAudioAlive(): void {
     try {
-      if ("wakeLock" in navigator) {
-        // 先移除旧的监听器避免重复
-        document.removeEventListener("visibilitychange", this.handleVisibilityChange);
-        this.wakeLock = await navigator.wakeLock.request("screen");
-        document.addEventListener("visibilitychange", this.handleVisibilityChange);
-      }
+      const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtor) return;
+      this.silentAudio = new AudioCtor();
+      // 播放静音振荡器 → 系统知道"这个 App 在用音频"→ 不暂停 WebView
+      const osc = this.silentAudio.createOscillator();
+      const gain = this.silentAudio.createGain();
+      gain.gain.value = 0; // 完全静音
+      osc.connect(gain);
+      gain.connect(this.silentAudio.destination);
+      osc.start();
     } catch {
-      // Wake Lock 不可用（iOS 旧版本或 WebView 不支持），静默忽略
+      // 不支持 AudioContext，忽略
     }
   }
 
   /**
-   * 释放屏幕常亮
+   * 释放静音音频上下文
    */
-  private async releaseWakeLock(): Promise<void> {
-    document.removeEventListener("visibilitychange", this.handleVisibilityChange);
-    if (this.wakeLock) {
-      try {
-        await this.wakeLock.release();
-      } catch {
-        // 忽略释放错误
-      }
-      this.wakeLock = null;
+  private stopAudioAlive(): void {
+    if (this.silentAudio) {
+      try { this.silentAudio.close(); } catch {}
+      this.silentAudio = null;
     }
   }
-
-  /**
-   * 页面可见性变化时重新请求 Wake Lock
-   */
-  private handleVisibilityChange = () => {
-    if (document.visibilityState === "visible" && this.state === "recording") {
-      // 用户回到页面但录音还在继续，重新请求屏幕常亮
-      navigator.wakeLock.request("screen").then((wl) => {
-        this.wakeLock = wl;
-      }).catch(() => {});
-    }
-  };
 
   /**
    * 开始录制
@@ -125,8 +113,8 @@ export class AudioRecorder {
     this.mediaRecorder.start(100);
     this.startTime = Date.now();
 
-    // 请求屏幕常亮（防息屏）
-    this.requestWakeLock();
+    // 保持音频会话活跃（息屏后系统知道"App 在用麦克风"）
+    this.keepAudioAlive();
   }
 
   /**
@@ -204,13 +192,13 @@ export class AudioRecorder {
   }
 
   /**
-   * 释放麦克风和 Wake Lock
+   * 释放麦克风和音频会话
    */
   private cleanup(): void {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.mediaRecorder = null;
-    this.releaseWakeLock();
+    this.stopAudioAlive();
   }
 
   /** 取消录制（丢弃数据） */
@@ -223,6 +211,6 @@ export class AudioRecorder {
     this.stream = null;
     this.mediaRecorder = null;
     this.chunks = [];
-    this.releaseWakeLock();
+    this.stopAudioAlive();
   }
 }
