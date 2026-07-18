@@ -7,6 +7,7 @@
 
 import { VolcengineSTT } from "./volcengine-stt";
 import { QwenSTT } from "./qwen-stt";
+import { SiliconFlowSTT } from "./siliconflow-stt";
 
 export interface STTResult {
   text: string;
@@ -21,12 +22,17 @@ export interface STTProvider {
   ): Promise<STTResult>;
 }
 
-export type STTProviderType = "volcengine" | "qwen" | "openai-whisper";
+export type STTProviderType =
+  | "volcengine"
+  | "qwen"
+  | "siliconflow"
+  | "openai-whisper";
 
 export const STT_PROVIDER_LABELS: Record<STTProviderType, string> = {
   volcengine: "火山引擎",
   qwen: "千问（通义）",
-  "openai-whisper": "OpenAI Whisper",
+  siliconflow: "硅基流动 (SenseVoiceSmall)",
+  "openai-whisper": "OpenAI 兼容接口",
 };
 
 export interface STTProviderConfig {
@@ -35,6 +41,7 @@ export interface STTProviderConfig {
   volcSecretKey: string;
   volcAppId: string;
   qwenApiKey: string;
+  siliconflowApiKey: string;
   openaiApiKey: string;
 }
 
@@ -51,8 +58,10 @@ export function createSTTProvider(config: STTProviderConfig): STTProvider {
       );
     case "qwen":
       return new QwenSTT(config.qwenApiKey);
+    case "siliconflow":
+      return new SiliconFlowSTT(config.siliconflowApiKey);
     case "openai-whisper":
-      throw new Error("OpenAI Whisper 尚未实现，敬请期待");
+      throw new Error("OpenAI 兼容接口尚未实现，敬请期待");
     default:
       throw new Error(`未知的 STT 服务商: ${config.sttProvider}`);
   }
@@ -71,6 +80,8 @@ export function isSTTConfigReady(config: STTProviderConfig): boolean {
       );
     case "qwen":
       return !!config.qwenApiKey;
+    case "siliconflow":
+      return !!config.siliconflowApiKey;
     case "openai-whisper":
       return false;
     default:
@@ -92,8 +103,10 @@ export function getSTTConfigHint(config: STTProviderConfig): string {
     }
     case "qwen":
       return "请在设置中填写千问 API Key";
+    case "siliconflow":
+      return "请在设置中填写硅基流动 API Key";
     case "openai-whisper":
-      return "OpenAI Whisper 尚未实现";
+      return "OpenAI 兼容接口尚未实现";
     default:
       return "请先在设置中选择并配置 STT 服务商";
   }

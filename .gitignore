@@ -15,4 +15,4 @@ Thumbs.db
 *.swo
 
 # Claude local settings (contains API keys)
-.claude/.claude/
+.claude/settings.local.json

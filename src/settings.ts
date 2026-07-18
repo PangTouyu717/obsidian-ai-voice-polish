@@ -4,6 +4,7 @@ import { STTProviderType, STT_PROVIDER_LABELS } from "./services/stt-provider";
 import { testDeepSeekConnection } from "./services/ai-service";
 import { testVolcengineConnection } from "./services/volcengine-stt";
 import { testQwenConnection } from "./services/qwen-stt";
+import { testSiliconFlowConnection } from "./services/siliconflow-stt";
 
 /**
  * 插件设置项
@@ -20,6 +21,8 @@ export interface AiVoicePolishSettings {
   volcAppId: string;
   /** 千问 API Key */
   qwenApiKey: string;
+  /** 硅基流动 API Key */
+  siliconflowApiKey: string;
   /** OpenAI API Key */
   openaiApiKey: string;
 
@@ -44,6 +47,7 @@ export const DEFAULT_SETTINGS: AiVoicePolishSettings = {
   volcSecretKey: "",
   volcAppId: "",
   qwenApiKey: "",
+  siliconflowApiKey: "",
   openaiApiKey: "",
   audioFolder: "voice",
   noteFolder: "",
@@ -78,14 +82,17 @@ export class AiVoicePolishSettingTab extends PluginSettingTab {
       .setDesc("选择语音转文字的服务提供商")
       .addDropdown((dropdown) => {
         const providers: STTProviderType[] = [
-          "volcengine",
+          "siliconflow",
           "qwen",
+          "volcengine",
           "openai-whisper",
         ];
         for (const p of providers) {
           const label =
             p === "openai-whisper"
               ? `${STT_PROVIDER_LABELS[p]} (即将支持)`
+              : p === "siliconflow"
+              ? `🔥 ${STT_PROVIDER_LABELS[p]}（推荐）`
               : STT_PROVIDER_LABELS[p];
           dropdown.addOption(p, label);
         }
@@ -179,10 +186,39 @@ export class AiVoicePolishSettingTab extends PluginSettingTab {
       });
     }
 
+    // ── 条件：硅基流动配置 ──
+    if (this.plugin.settings.sttProvider === "siliconflow") {
+      containerEl.createEl("p", {
+        text: "在硅基流动控制台创建 API Key。SenseVoiceSmall 模型永久免费，中文识别效果优于 Whisper，国内直连。",
+        cls: "setting-item-description",
+      });
+
+      new Setting(containerEl)
+        .setName("API Key")
+        .setDesc("硅基流动的 API Key，以 sk- 开头")
+        .addText((text) => {
+          text
+            .setPlaceholder("sk-...")
+            .setValue(this.plugin.settings.siliconflowApiKey)
+            .onChange(async (value) => {
+              this.plugin.settings.siliconflowApiKey = value;
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.type = "password";
+        });
+
+      // 硅基流动测试连接按钮
+      this.addTestButton("测试硅基流动连接", async () => {
+        return testSiliconFlowConnection(
+          this.plugin.settings.siliconflowApiKey
+        );
+      });
+    }
+
     // ── 条件：OpenAI Whisper ──
     if (this.plugin.settings.sttProvider === "openai-whisper") {
       containerEl.createEl("p", {
-        text: "OpenAI Whisper 支持尚未完成，敬请期待。",
+        text: "OpenAI 兼容接口支持尚未完成，敬请期待。可用于接入本地 Whisper 服务或任何 OpenAI 格式的 STT API。",
         cls: "setting-item-description",
       });
 
